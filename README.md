@@ -104,6 +104,9 @@ and then
 delegate the command to the decider which can produce new state as a result. New state is then stored
 via `StateRepository.save` async function.
 
+It is a formalization of the state stored information system.
+
+
 ## View
 
 `View`  is a datatype that represents the event handling algorithm, responsible for translating the events into
@@ -143,6 +146,18 @@ Cargo is Rust’s build system and package manager. We can use it to test and bu
 
 ```shell
 cargo test
+```
+
+## Install the crate as a dependency of your project
+
+Run the following Cargo command in your project directory:
+```shell
+
+```
+Or add the following line to your `Cargo.toml` file:
+
+```toml
+fmodel-rust = "0.1.0"
 ```
 
 ## FModel in other languages
