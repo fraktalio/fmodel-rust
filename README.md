@@ -1,5 +1,7 @@
 # **f`(`model`)`** - Functional Domain Modeling with Rust
 
+>Publicly available at [crates.io](https://crates.io/crates/fmodel-rust) and [docs.rs](https://docs.rs/fmodel-rust/latest/fmodel_rust/)
+
 When you’re developing an information system to automate the activities of the business, you are modeling the business.
 The abstractions that you design, the behaviors that you implement, and the UI interactions that you build all reflect
 the business — together, they constitute the model of the domain.
@@ -152,7 +154,7 @@ cargo test
 
 Run the following Cargo command in your project directory:
 ```shell
-
+cargo add fmodel-rust
 ```
 Or add the following line to your `Cargo.toml` file:
 
