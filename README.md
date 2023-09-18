@@ -24,16 +24,20 @@ construct.
 Abstraction and generalization are often used together. Abstracts are generalized through parameterization to provide
 more excellent utility.
 
-## `type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>`
+## `Box<dyn Fn(&C, &S) -> Vec<E>>`
+
+`type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>`
 
 On a higher level of abstraction, any information system is responsible for handling the intent (`Command`) and based on
 the current `State`, produce new facts (`Events`):
 
 - given the current `State/S` *on the input*,
 - when `Command/C` is handled *on the input*,
-- expect `flow` of new `Events/E` to be published/emitted *on the output*
+- expect `Vec` of new `Events/E` to be published/emitted *on the output*
 
-## `type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>`
+## `Box<dyn Fn(&S, &E) -> S>`
+
+`type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>`
 
 The new state is always evolved out of the current state `S` and the current event `E`:
 
