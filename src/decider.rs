@@ -233,18 +233,18 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
 }
 
 /// Formalizes the `Event Computation` algorithm / event sourced system for the `decider` to handle commands based on the current events, and produce new events.
-pub trait EventComputation<C, E> {
+pub trait EventComputation<C, S, E> {
     /// Computes new events based on the current events and the command.
     fn compute_new_events(&self, current_events: &[E], command: &C) -> Vec<E>;
 }
 
 /// Formalizes the `State Computation` algorithm / state-stored system for the `decider` to handle commands based on the current state, and produce new state.
-pub trait StateComputation<C, S> {
+pub trait StateComputation<C, S, E> {
     /// Computes new state based on the current state and the command.
     fn compute_new_state(&self, current_state: Option<S>, command: &C) -> S;
 }
 
-impl<'a, C, S, E> EventComputation<C, E> for Decider<'a, C, S, E> {
+impl<'a, C, S, E> EventComputation<C, S, E> for Decider<'a, C, S, E> {
     /// Computes new events based on the current events and the command.
     fn compute_new_events(&self, current_events: &[E], command: &C) -> Vec<E> {
         let current_state: S = current_events
@@ -256,7 +256,7 @@ impl<'a, C, S, E> EventComputation<C, E> for Decider<'a, C, S, E> {
     }
 }
 
-impl<'a, C, S, E> StateComputation<C, S> for Decider<'a, C, S, E> {
+impl<'a, C, S, E> StateComputation<C, S, E> for Decider<'a, C, S, E> {
     /// Computes new state based on the current state and the command.
     fn compute_new_state(&self, current_state: Option<S>, command: &C) -> S {
         let effective_current_state = current_state.unwrap_or_else(|| (self.initial_state)());

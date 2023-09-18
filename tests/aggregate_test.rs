@@ -44,10 +44,9 @@ impl InMemoryOrderEventRepository {
 
 /// Implementation of [EventRepository] for [InMemoryOrderEventRepository] - infrastructure
 #[async_trait]
-impl EventRepository<OrderCommand, OrderEvent> for InMemoryOrderEventRepository {
-    type Error = AggregateError;
-    type Version = i32;
-
+impl EventRepository<OrderCommand, OrderEvent, i32, AggregateError>
+    for InMemoryOrderEventRepository
+{
     async fn fetch_events(
         &self,
         command: &OrderCommand,
@@ -98,10 +97,9 @@ impl InMemoryOrderStateRepository {
 
 // Implementation of [StateRepository] for [InMemoryOrderStateRepository]
 #[async_trait]
-impl StateRepository<OrderCommand, OrderState> for InMemoryOrderStateRepository {
-    type Version = i32;
-    type Error = AggregateError;
-
+impl StateRepository<OrderCommand, OrderState, i32, AggregateError>
+    for InMemoryOrderStateRepository
+{
     async fn fetch_state(
         &self,
         command: &OrderCommand,
@@ -191,10 +189,7 @@ fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
 #[tokio::test]
 async fn es_test() {
     let repository = InMemoryOrderEventRepository::new();
-    let aggregate = EventSourcedAggregate {
-        repository,
-        decider: decider(),
-    };
+    let aggregate = EventSourcedAggregate::new(repository, decider());
     let command = OrderCommand::Create(CreateOrderCommand {
         order_id: 1,
         customer_name: "John Doe".to_string(),
@@ -244,10 +239,7 @@ async fn es_test() {
 #[tokio::test]
 async fn ss_test() {
     let repository = InMemoryOrderStateRepository::new();
-    let aggregate = StateStoredAggregate {
-        repository,
-        decider: decider(),
-    };
+    let aggregate = StateStoredAggregate::new(repository, decider());
     let command = OrderCommand::Create(CreateOrderCommand {
         order_id: 1,
         customer_name: "John Doe".to_string(),

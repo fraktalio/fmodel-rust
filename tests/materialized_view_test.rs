@@ -72,9 +72,9 @@ impl InMemoryViewOrderStateRepository {
 
 // Implementation of [ViewStateRepository] for [InMemoryViewOrderStateRepository]
 #[async_trait]
-impl ViewStateRepository<OrderEvent, OrderViewState> for InMemoryViewOrderStateRepository {
-    type Error = MaterializedViewError;
-
+impl ViewStateRepository<OrderEvent, OrderViewState, MaterializedViewError>
+    for InMemoryViewOrderStateRepository
+{
     async fn fetch_state(
         &self,
         event: &OrderEvent,
@@ -94,10 +94,7 @@ impl ViewStateRepository<OrderEvent, OrderViewState> for InMemoryViewOrderStateR
 #[tokio::test]
 async fn test() {
     let repository = InMemoryViewOrderStateRepository::new();
-    let materialized_view = MaterializedView {
-        repository,
-        view: view(),
-    };
+    let materialized_view = MaterializedView::new(repository, view());
     let event = OrderEvent::Created(OrderCreatedEvent {
         order_id: 1,
         customer_name: "John Doe".to_string(),
