@@ -6,9 +6,9 @@ description = "Accelerate development of compositional, safe, and ergonomic appl
 license = "Apache-2.0"
 
 [dependencies]
-async-trait = "0.1.49"
+async-trait = "0.1.73"
 
 [dev-dependencies]
 derive_more = "0.99.17"
-tokio = { version = "1.0.0", features = ["rt", "rt-multi-thread", "macros"] }
+tokio = { version = "1.32.0", features = ["rt", "rt-multi-thread", "macros"] }
 
