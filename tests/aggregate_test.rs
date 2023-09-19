@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use async_trait::async_trait;
 use derive_more::Display;
@@ -189,107 +190,227 @@ fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
 #[tokio::test]
 async fn es_test() {
     let repository = InMemoryOrderEventRepository::new();
-    let aggregate = EventSourcedAggregate::new(repository, decider());
-    let command = OrderCommand::Create(CreateOrderCommand {
-        order_id: 1,
-        customer_name: "John Doe".to_string(),
-        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+    let aggregate = Arc::new(EventSourcedAggregate::new(repository, decider()));
+    // Makes a clone of the Arc pointer.
+    // This creates another pointer to the same allocation, increasing the strong reference count.
+    let aggregate2 = Arc::clone(&aggregate);
+
+    // Lets spawn two threads to simulate two concurrent requests
+    let handle1 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Created(OrderCreatedEvent {
+                    order_id: 1,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                }),
+                0
+            )]
+        );
+        let command = OrderCommand::Update(UpdateOrderCommand {
+            order_id: 1,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Updated(OrderUpdatedEvent {
+                    order_id: 1,
+                    updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                }),
+                1
+            )]
+        );
+        let command = OrderCommand::Cancel(CancelOrderCommand { order_id: 1 });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Cancelled(OrderCancelledEvent { order_id: 1 }),
+                2
+            )]
+        );
     });
-    let result = aggregate.handle(&command).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        [(
-            OrderEvent::Created(OrderCreatedEvent {
-                order_id: 1,
-                customer_name: "John Doe".to_string(),
-                items: vec!["Item 1".to_string(), "Item 2".to_string()],
-            }),
-            0
-        )]
-    );
-    let command = OrderCommand::Update(UpdateOrderCommand {
-        order_id: 1,
-        new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+
+    let handle2 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 2,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Created(OrderCreatedEvent {
+                    order_id: 2,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                }),
+                0
+            )]
+        );
+        let command = OrderCommand::Update(UpdateOrderCommand {
+            order_id: 2,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Updated(OrderUpdatedEvent {
+                    order_id: 2,
+                    updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                }),
+                1
+            )]
+        );
+        let command = OrderCommand::Cancel(CancelOrderCommand { order_id: 2 });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Cancelled(OrderCancelledEvent { order_id: 2 }),
+                2
+            )]
+        );
     });
-    let result = aggregate.handle(&command).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        [(
-            OrderEvent::Updated(OrderUpdatedEvent {
-                order_id: 1,
-                updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
-            }),
-            1
-        )]
-    );
-    let command = OrderCommand::Cancel(CancelOrderCommand { order_id: 1 });
-    let result = aggregate.handle(&command).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        [(
-            OrderEvent::Cancelled(OrderCancelledEvent { order_id: 1 }),
-            2
-        )]
-    );
+
+    handle1.join().unwrap().await;
+    handle2.join().unwrap().await;
 }
 
 #[tokio::test]
 async fn ss_test() {
     let repository = InMemoryOrderStateRepository::new();
-    let aggregate = StateStoredAggregate::new(repository, decider());
-    let command = OrderCommand::Create(CreateOrderCommand {
-        order_id: 1,
-        customer_name: "John Doe".to_string(),
-        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+    let aggregate = Arc::new(StateStoredAggregate::new(repository, decider()));
+    let aggregate2 = Arc::clone(&aggregate);
+
+    let handle1 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                OrderState {
+                    order_id: 1,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    is_cancelled: false,
+                },
+                0
+            )
+        );
+        let command = OrderCommand::Update(UpdateOrderCommand {
+            order_id: 1,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                OrderState {
+                    order_id: 1,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                    is_cancelled: false,
+                },
+                1
+            )
+        );
+        let command = OrderCommand::Cancel(CancelOrderCommand { order_id: 1 });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                OrderState {
+                    order_id: 1,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                    is_cancelled: true,
+                },
+                2
+            )
+        );
     });
-    let result = aggregate.handle(&command).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        (
-            OrderState {
-                order_id: 1,
-                customer_name: "John Doe".to_string(),
-                items: vec!["Item 1".to_string(), "Item 2".to_string()],
-                is_cancelled: false,
-            },
-            0
-        )
-    );
-    let command = OrderCommand::Update(UpdateOrderCommand {
-        order_id: 1,
-        new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+
+    let handle2 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 2,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                OrderState {
+                    order_id: 2,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    is_cancelled: false,
+                },
+                0
+            )
+        );
+        let command = OrderCommand::Update(UpdateOrderCommand {
+            order_id: 2,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                OrderState {
+                    order_id: 2,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                    is_cancelled: false,
+                },
+                1
+            )
+        );
+        let command = OrderCommand::Cancel(CancelOrderCommand { order_id: 2 });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                OrderState {
+                    order_id: 2,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                    is_cancelled: true,
+                },
+                2
+            )
+        );
     });
-    let result = aggregate.handle(&command).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        (
-            OrderState {
-                order_id: 1,
-                customer_name: "John Doe".to_string(),
-                items: vec!["Item 3".to_string(), "Item 4".to_string()],
-                is_cancelled: false,
-            },
-            1
-        )
-    );
-    let command = OrderCommand::Cancel(CancelOrderCommand { order_id: 1 });
-    let result = aggregate.handle(&command).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        (
-            OrderState {
-                order_id: 1,
-                customer_name: "John Doe".to_string(),
-                items: vec!["Item 3".to_string(), "Item 4".to_string()],
-                is_cancelled: true,
-            },
-            2
-        )
-    );
+
+    handle1.join().unwrap().await;
+    handle2.join().unwrap().await;
 }

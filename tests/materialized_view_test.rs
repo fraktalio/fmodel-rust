@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use async_trait::async_trait;
 use derive_more::Display;
@@ -94,48 +95,103 @@ impl ViewStateRepository<OrderEvent, OrderViewState, MaterializedViewError>
 #[tokio::test]
 async fn test() {
     let repository = InMemoryViewOrderStateRepository::new();
-    let materialized_view = MaterializedView::new(repository, view());
-    let event = OrderEvent::Created(OrderCreatedEvent {
-        order_id: 1,
-        customer_name: "John Doe".to_string(),
-        items: vec!["Item 1".to_string(), "Item 2".to_string()],
-    });
-    let result = materialized_view.handle(&event).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        OrderViewState {
+    let materialized_view = Arc::new(MaterializedView::new(repository, view()));
+    let materialized_view1 = Arc::clone(&materialized_view);
+    let materialized_view2 = Arc::clone(&materialized_view);
+
+    // Lets spawn two threads to simulate two concurrent requests
+    let handle1 = thread::spawn(|| async move {
+        let event = OrderEvent::Created(OrderCreatedEvent {
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
-            is_cancelled: false,
-        }
-    );
-    let event = OrderEvent::Updated(OrderUpdatedEvent {
-        order_id: 1,
-        updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = materialized_view1.handle(&event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            OrderViewState {
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                is_cancelled: false,
+            }
+        );
+        let event = OrderEvent::Updated(OrderUpdatedEvent {
+            order_id: 1,
+            updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = materialized_view1.handle(&event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            OrderViewState {
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                is_cancelled: false,
+            }
+        );
+        let event = OrderEvent::Cancelled(OrderCancelledEvent { order_id: 1 });
+        let result = materialized_view1.handle(&event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            OrderViewState {
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                is_cancelled: true,
+            }
+        );
     });
-    let result = materialized_view.handle(&event).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        OrderViewState {
-            order_id: 1,
+
+    let handle2 = thread::spawn(|| async move {
+        let event = OrderEvent::Created(OrderCreatedEvent {
+            order_id: 2,
             customer_name: "John Doe".to_string(),
-            items: vec!["Item 3".to_string(), "Item 4".to_string()],
-            is_cancelled: false,
-        }
-    );
-    let event = OrderEvent::Cancelled(OrderCancelledEvent { order_id: 1 });
-    let result = materialized_view.handle(&event).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        OrderViewState {
-            order_id: 1,
-            customer_name: "John Doe".to_string(),
-            items: vec!["Item 3".to_string(), "Item 4".to_string()],
-            is_cancelled: true,
-        }
-    );
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = materialized_view2.handle(&event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            OrderViewState {
+                order_id: 2,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                is_cancelled: false,
+            }
+        );
+        let event = OrderEvent::Updated(OrderUpdatedEvent {
+            order_id: 2,
+            updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = materialized_view2.handle(&event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            OrderViewState {
+                order_id: 2,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                is_cancelled: false,
+            }
+        );
+        let event = OrderEvent::Cancelled(OrderCancelledEvent { order_id: 2 });
+        let result = materialized_view2.handle(&event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            OrderViewState {
+                order_id: 2,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                is_cancelled: true,
+            }
+        );
+    });
+
+    handle1.join().unwrap().await;
+    handle2.join().unwrap().await;
 }
