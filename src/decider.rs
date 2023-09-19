@@ -162,8 +162,8 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
     /// Creates a new instance of [Decider]`<C, S2, E>`.
     pub fn map_state<S2, F1, F2>(self, f1: &'a F1, f2: &'a F2) -> Decider<'a, C, S2, E>
     where
-        F1: Fn(&S2) -> S,
-        F2: Fn(&S) -> S2,
+        F1: Fn(&S2) -> S + Send + Sync,
+        F2: Fn(&S) -> S2 + Send + Sync,
     {
         let new_decide = Box::new(move |c: &C, s2: &S2| {
             let s = f1(s2);
@@ -188,8 +188,8 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
     /// Creates a new instance of [Decider]`<C, S, E2>`.
     pub fn map_event<E2, F1, F2>(self, f1: &'a F1, f2: &'a F2) -> Decider<'a, C, S, E2>
     where
-        F1: Fn(&E2) -> E,
-        F2: Fn(&E) -> E2,
+        F1: Fn(&E2) -> E + Send + Sync,
+        F2: Fn(&E) -> E2 + Send + Sync,
     {
         let new_decide = Box::new(move |c: &C, s: &S| {
             (self.decide)(c, s).into_iter().map(|e: E| f2(&e)).collect()
@@ -213,7 +213,7 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
     /// Creates a new instance of [Decider]`<C2, S, E>`.
     pub fn map_command<C2, F>(self, f: &'a F) -> Decider<'a, C2, S, E>
     where
-        F: Fn(&C2) -> C,
+        F: Fn(&C2) -> C + Send + Sync,
     {
         let new_decide = Box::new(move |c2: &C2, s: &S| {
             let c = f(c2);

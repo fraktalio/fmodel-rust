@@ -26,7 +26,7 @@ more excellent utility.
 
 ## `Box<dyn Fn(&C, &S) -> Vec<E>>`
 
-`type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a>`
+`type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>`
 
 On a higher level of abstraction, any information system is responsible for handling the intent (`Command`) and based on
 the current `State`, produce new facts (`Events`):
@@ -37,7 +37,7 @@ the current `State`, produce new facts (`Events`):
 
 ## `Box<dyn Fn(&S, &E) -> S>`
 
-`type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a>`
+`type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>`
 
 The new state is always evolved out of the current state `S` and the current event `E`:
 
@@ -75,9 +75,9 @@ behavior. `Decider` behaves the same for `C`=`Int` or `C`=`YourCustomType`, for 
 - `E` - Event
 
 ```rust
-pub type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a>;
-pub type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a>;
-pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a>;
+pub type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>;
+pub type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>;
+pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a + Send + Sync>;
 
 pub struct Decider<'a, C: 'a, S: 'a, E: 'a> {
     pub decide: DecideFunction<'a, C, S, E>,
