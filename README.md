@@ -146,13 +146,390 @@ In order to handle the event, materialized view needs to fetch the current state
 suspending function first, and then delegate the event to the view, which can produce new state as a result. New state
 is then stored via `ViewStateRepository.save` suspending function.
 
-## Testing the crate
+## Algebraic Data Types
 
-Cargo is Rust’s build system and package manager. We can use it to test and build the library:
+In Rust, we can use ADTs to model our application's domain entities and relationships in a functional way, clearly defining the set of possible values and states.
+Rust has two main types of ADTs: `enum` and `struct`. 
 
-```shell
-cargo test
+ - `enum` is used to define a type that can take on one of several possible variants - modeling a `sum/OR` type.
+ - `struct` is used to express a type that has named fields - modeling a `product/AND` type.
+
+ADTs will help with
+
+ - representing the business domain in the code accurately
+ - enforcing correctness
+ - reducing the likelihood of bugs.
+
+In FModel, we extensively use ADTs to model the data.
+
+### `C` / Command / Intent to change the state of the system
+
+```rust
+// models Sum/Or type / multiple possible variants
+pub enum OrderCommand {
+    Create(CreateOrderCommand),
+    Update(UpdateOrderCommand),
+    Cancel(CancelOrderCommand),
+}
+// models Product/And type / a concrete variant, consisting of named fields
+pub struct CreateOrderCommand {
+    pub order_id: u32,
+    pub customer_name: String,
+    pub items: Vec<String>,
+}
+// models Product/And type / a concrete variant, consisting of named fields
+pub struct UpdateOrderCommand {
+    pub order_id: u32,
+    pub new_items: Vec<String>,
+}
+// models Product/And type / a concrete variant, consisting of named fields
+#[derive(Debug)]
+pub struct CancelOrderCommand {
+    pub order_id: u32,
+}
 ```
+
+### `E` / Event / Fact
+
+```rust
+// models Sum/Or type / multiple possible variants
+pub enum OrderEvent {
+    Created(OrderCreatedEvent),
+    Updated(OrderUpdatedEvent),
+    Cancelled(OrderCancelledEvent),
+}
+// models Product/And type / a concrete variant, consisting of named fields
+pub struct OrderCreatedEvent {
+    pub order_id: u32,
+    pub customer_name: String,
+    pub items: Vec<String>,
+}
+// models Product/And type / a concrete variant, consisting of named fields
+pub struct OrderUpdatedEvent {
+    pub order_id: u32,
+    pub updated_items: Vec<String>,
+}
+// models Product/And type / a concrete variant, consisting of named fields
+pub struct OrderCancelledEvent {
+    pub order_id: u32,
+}
+
+```
+
+## `S` / State / Current state of the system/aggregate/entity
+
+```rust
+struct OrderState {
+    order_id: u32,
+    customer_name: String,
+    items: Vec<String>,
+    is_cancelled: bool,
+}
+```
+
+## Modeling the Behaviour of our domain
+
+ - algebraic data types form the structure of our entities (commands, state, and events).
+ - functions/lambda offers the algebra of manipulating the entities in a compositional manner, effectively modeling the behavior.
+
+This leads to modularity in design and a clear separation of the entity’s structure and functions/behaviour of the entity.
+
+Fmodel library offers generic and abstract components to specialize in for your specific case/expected behavior:
+
+ - Decider - data type that represents the main decision-making algorithm.
+
+```rust
+fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
+    Decider {
+        // Your decision logic goes here.
+        decide: Box::new(|command, state| match command {
+            // Exhaustive pattern matching on the command
+            OrderCommand::Create(create_cmd) => {
+                vec![OrderEvent::Created(OrderCreatedEvent {
+                    order_id: create_cmd.order_id,
+                    customer_name: create_cmd.customer_name.to_owned(),
+                    items: create_cmd.items.to_owned(),
+                })]
+            }
+            OrderCommand::Update(update_cmd) => {
+                // Your validation logic goes here
+                if state.order_id == update_cmd.order_id {
+                    vec![OrderEvent::Updated(OrderUpdatedEvent {
+                        order_id: update_cmd.order_id,
+                        updated_items: update_cmd.new_items.to_owned(),
+                    })]
+                } else {
+                    // In case of validation failure, return empty list of events or error event
+                    vec![]
+                }
+            }
+            OrderCommand::Cancel(cancel_cmd) => {
+                // Your validation logic goes here
+                if state.order_id == cancel_cmd.order_id {
+                    vec![OrderEvent::Cancelled(OrderCancelledEvent {
+                        order_id: cancel_cmd.order_id,
+                    })]
+                } else {
+                    // In case of validation failure, return empty list of events or error event
+                    vec![]
+                }
+            }
+        }),
+        // Evolve the state based on the event(s)
+        evolve: Box::new(|state, event| {
+            let mut new_state = state.clone();
+            // Exhaustive pattern matching on the event
+            match event {
+                OrderEvent::Created(created_event) => {
+                    new_state.order_id = created_event.order_id;
+                    new_state.customer_name = created_event.customer_name.to_owned();
+                    new_state.items = created_event.items.to_owned();
+                }
+                OrderEvent::Updated(updated_event) => {
+                    new_state.items = updated_event.updated_items.to_owned();
+                }
+                OrderEvent::Cancelled(_) => {
+                    new_state.is_cancelled = true;
+                }
+            }
+            new_state
+        }),
+        // Initial state
+        initial_state: Box::new(|| OrderState {
+            order_id: 0,
+            customer_name: "".to_string(),
+            items: Vec::new(),
+            is_cancelled: false,
+        }),
+    }
+}
+```
+- View - represents the event handling algorithm responsible for translating the events into the denormalized state, which is adequate for querying.
+
+```rust
+// The state of the view component
+struct OrderViewState {
+    order_id: u32,
+    customer_name: String,
+    items: Vec<String>,
+    is_cancelled: bool,
+}
+
+fn view<'a>() -> View<'a, OrderViewState, OrderEvent> {
+    View {
+        // Evolve the state of the `view` based on the event(s)
+        evolve: Box::new(|state, event| {
+            let mut new_state = state.clone();
+            // Exhaustive pattern matching on the event
+            match event {
+                OrderEvent::Created(created_event) => {
+                    new_state.order_id = created_event.order_id;
+                    new_state.customer_name = created_event.customer_name.to_owned();
+                    new_state.items = created_event.items.to_owned();
+                }
+                OrderEvent::Updated(updated_event) => {
+                    new_state.items = updated_event.updated_items.to_owned();
+                }
+                OrderEvent::Cancelled(_) => {
+                    new_state.is_cancelled = true;
+                }
+            }
+            new_state
+        }),
+        // Initial state
+        initial_state: Box::new(|| OrderViewState {
+            order_id: 0,
+            customer_name: "".to_string(),
+            items: Vec::new(),
+            is_cancelled: false,
+        }),
+    }
+}
+
+```
+
+## The Application layer
+
+The logic execution will be orchestrated by the outside components that use the domain components (decider, view) to do the computations. These components will be responsible for fetching and saving the data (repositories).
+
+![onion architecture](https://fraktalio.com/blog/assets/images/onion.png)
+
+The arrows in the image show the direction of the dependency. Notice that all dependencies point inwards and that Domain does not depend on anybody or anything.
+
+Pushing these decisions from the core domain model is very valuable. Being able to postpone them is a sign of good architecture.
+
+**Event-sourcing aggregate**
+
+```rust
+    let repository = InMemoryOrderEventRepository::new();
+    let aggregate = EventSourcedAggregate::new(repository, decider());
+
+    let command = OrderCommand::Create(CreateOrderCommand {
+        order_id: 1,
+        customer_name: "John Doe".to_string(),
+        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+    });
+
+    let result = aggregate.handle(&command).await;
+    assert!(result.is_ok());
+    assert_eq!(
+        result.unwrap(),
+        [(
+            OrderEvent::Created(OrderCreatedEvent {
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 1".to_string(), "Item 2".to_string()],
+            }),
+            0
+        )]
+    );
+```
+
+**State-stored aggregate**
+```rust
+    let repository = InMemoryOrderStateRepository::new();
+    let aggregate = StateStoredAggregate::new(repository, decider());
+
+    let command = OrderCommand::Create(CreateOrderCommand {
+        order_id: 1,
+        customer_name: "John Doe".to_string(),
+        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+    });
+    let result = aggregate.handle(&command).await;
+    assert!(result.is_ok());
+    assert_eq!(
+        result.unwrap(),
+        (
+            OrderState {
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                is_cancelled: false,
+            },
+            0
+        )
+    );
+```
+
+## Fearless Concurrency
+
+Splitting the computation in your program into multiple threads to run multiple tasks at the same time can improve performance.
+However, programming with threads has a reputation for being difficult. Rust’s type system and ownership model guarantee thread safety.
+
+Example of the concurrent execution of the aggregate:
+
+```rust
+async fn es_test() {
+    let repository = InMemoryOrderEventRepository::new();
+    let aggregate = Arc::new(EventSourcedAggregate::new(repository, decider()));
+    // Makes a clone of the Arc pointer. This creates another pointer to the same allocation, increasing the strong reference count.
+    let aggregate2 = Arc::clone(&aggregate);
+
+    // Lets spawn two threads to simulate two concurrent requests
+    let handle1 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Created(OrderCreatedEvent {
+                    order_id: 1,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                }),
+                0
+            )]
+        );
+        let command = OrderCommand::Update(UpdateOrderCommand {
+            order_id: 1,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Updated(OrderUpdatedEvent {
+                    order_id: 1,
+                    updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                }),
+                1
+            )]
+        );
+        let command = OrderCommand::Cancel(CancelOrderCommand { order_id: 1 });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Cancelled(OrderCancelledEvent { order_id: 1 }),
+                2
+            )]
+        );
+    });
+
+    let handle2 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 2,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Created(OrderCreatedEvent {
+                    order_id: 2,
+                    customer_name: "John Doe".to_string(),
+                    items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                }),
+                0
+            )]
+        );
+        let command = OrderCommand::Update(UpdateOrderCommand {
+            order_id: 2,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Updated(OrderUpdatedEvent {
+                    order_id: 2,
+                    updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                }),
+                1
+            )]
+        );
+        let command = OrderCommand::Cancel(CancelOrderCommand { order_id: 2 });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                OrderEvent::Cancelled(OrderCancelledEvent { order_id: 2 }),
+                2
+            )]
+        );
+    });
+
+    handle1.join().unwrap().await;
+    handle2.join().unwrap().await;
+}
+```
+
+You might wonder why all primitive types i Rust aren’t atomic and why standard library types aren’t implemented to use `Arc<T>` by default.
+The reason is that thread safety comes with a performance penalty that you only want to pay when you really need to.
+
+**You choose how to run it!** You can run it in a single-threaded, multi-threaded, or distributed environment.
 
 ## Install the crate as a dependency of your project
 
@@ -178,7 +555,6 @@ fmodel-rust = "0.1.0"
 - [https://fraktalio.com/fmodel/](https://fraktalio.com/fmodel/)
 - [https://fraktalio.com/fmodel-ts/](https://fraktalio.com/fmodel-ts/)
 - [https://xebia.com/blog/functional-domain-modeling-in-rust-part-1/](https://xebia.com/blog/functional-domain-modeling-in-rust-part-1/)
-- [https://xebia.com/blog/functional-domain-modeling-in-rust-part-2/](https://xebia.com/blog/functional-domain-modeling-in-rust-part-2/)
 
 
 ## Credits
