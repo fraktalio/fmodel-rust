@@ -526,7 +526,7 @@ async fn es_test() {
 }
 ```
 
-You might wonder why all primitive types i Rust aren’t atomic and why standard library types aren’t implemented to use `Arc<T>` by default.
+You might wonder why all primitive types in Rust aren’t atomic and why standard library types aren’t implemented to use `Arc<T>` by default.
 The reason is that thread safety comes with a performance penalty that you only want to pay when you really need to.
 
 **You choose how to run it!** You can run it in a single-threaded, multi-threaded, or distributed environment.
