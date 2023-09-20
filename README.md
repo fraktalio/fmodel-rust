@@ -352,9 +352,8 @@ fn view<'a>() -> View<'a, OrderViewState, OrderEvent> {
 
 The logic execution will be orchestrated by the outside components that use the domain components (decider, view) to do the computations. These components will be responsible for fetching and saving the data (repositories).
 
-![onion architecture](https://fraktalio.com/blog/assets/images/onion.png)
 
-The arrows in the image show the direction of the dependency. Notice that all dependencies point inwards and that Domain does not depend on anybody or anything.
+The arrows in the image (adapters->application->domain) show the direction of the dependency. Notice that all dependencies point inward and that Domain does not depend on anybody or anything.
 
 Pushing these decisions from the core domain model is very valuable. Being able to postpone them is a sign of good architecture.
 
