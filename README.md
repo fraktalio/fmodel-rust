@@ -539,7 +539,7 @@ cargo add fmodel-rust
 Or add the following line to your `Cargo.toml` file:
 
 ```toml
-fmodel-rust = "0.1.0"
+fmodel-rust = "0.2.0"
 ```
 
 ## FModel in other languages
