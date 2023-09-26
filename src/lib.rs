@@ -114,6 +114,7 @@
 pub mod aggregate;
 pub mod decider;
 pub mod materialized_view;
+pub mod saga;
 pub mod view;
 
 /// The [DecideFunction] function is used to decide which events to produce based on the command and the current state.
@@ -122,3 +123,5 @@ pub type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send 
 pub type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>;
 /// The [InitialStateFunction] function is used to produce the initial state.
 pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a + Send + Sync>;
+/// The [ReactFunction] function is used to decide what actions/A to execute next based on the action result/AR.
+pub type ReactFunction<'a, AR, A> = Box<dyn Fn(&AR) -> Vec<A> + 'a + Send + Sync>;

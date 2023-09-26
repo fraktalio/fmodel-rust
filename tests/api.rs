@@ -36,6 +36,7 @@ impl OrderCommand {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum OrderEvent {
     Created(OrderCreatedEvent),
     Updated(OrderUpdatedEvent),
@@ -69,4 +70,18 @@ impl OrderEvent {
             OrderEvent::Cancelled(c) => c.order_id.to_owned(),
         }
     }
+}
+
+#[derive(Debug, PartialEq)]
+#[allow(dead_code)]
+pub enum ShipmentCommand {
+    Create(CreateShipmentCommand),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CreateShipmentCommand {
+    pub shipment_id: u32,
+    pub order_id: u32,
+    pub customer_name: String,
+    pub items: Vec<String>,
 }
