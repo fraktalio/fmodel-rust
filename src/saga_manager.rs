@@ -26,8 +26,8 @@ pub trait ActionPublisher<A, Error> {
 /// - `Publisher` - Action Publisher
 /// - `Error` - Error
 pub struct SagaManager<'a, A, AR, Publisher, Error>
-    where
-        Publisher: ActionPublisher<A, Error>,
+where
+    Publisher: ActionPublisher<A, Error>,
 {
     action_publisher: Publisher,
     saga: Saga<'a, AR, A>,
@@ -35,8 +35,8 @@ pub struct SagaManager<'a, A, AR, Publisher, Error>
 }
 
 impl<'a, A, AR, Publisher, Error> SagaManager<'a, A, AR, Publisher, Error>
-    where
-        Publisher: ActionPublisher<A, Error>,
+where
+    Publisher: ActionPublisher<A, Error>,
 {
     pub fn new(action_publisher: Publisher, saga: Saga<'a, AR, A>) -> Self {
         SagaManager {

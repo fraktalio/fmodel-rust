@@ -115,8 +115,8 @@ pub mod aggregate;
 pub mod decider;
 pub mod materialized_view;
 pub mod saga;
-pub mod view;
 pub mod saga_manager;
+pub mod view;
 
 /// The [DecideFunction] function is used to decide which events to produce based on the command and the current state.
 pub type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>;
