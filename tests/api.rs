@@ -1,3 +1,4 @@
+// Order API
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum OrderCommand {
@@ -72,13 +73,14 @@ impl OrderEvent {
     }
 }
 
-#[derive(Debug, PartialEq)]
+// Shipment API
+#[derive(Debug, PartialEq, Clone)]
 #[allow(dead_code)]
 pub enum ShipmentCommand {
     Create(CreateShipmentCommand),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CreateShipmentCommand {
     pub shipment_id: u32,
     pub order_id: u32,
