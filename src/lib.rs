@@ -42,9 +42,10 @@
 //! ### Event-sourcing aggregate
 //!
 //! [aggregate::EventSourcedAggregate]  is using/delegating a `Decider` to handle commands and produce new events.
-//! It belongs to the
-//! Application layer. In order to
-//! handle the command, aggregate needs to fetch the current state (represented as a list/vector of events)
+//!
+//! It belongs to the Application layer.
+//!
+//! In order to handle the command, aggregate needs to fetch the current state (represented as a list/vector of events)
 //! via `EventRepository.fetchEvents` async function, and then delegate the command to the decider which can produce new
 //! events as
 //! a result. Produced events are then stored via `EventRepository.save` async function.
@@ -53,10 +54,11 @@
 //!
 //! ### State-stored aggregate
 //!
-//! [aggregate::StateStoredAggregate] is using/delegating a `Decider` to handle commands and produce new state. It
-//! belongs to the
-//! Application layer. In order to
-//! handle the command, aggregate needs to fetch the current state via `StateRepository.fetchState` async function first,
+//! [aggregate::StateStoredAggregate] is using/delegating a `Decider` to handle commands and produce new state.
+//!
+//! It belongs to the Application layer.
+//!
+//! In order to handle the command, aggregate needs to fetch the current state via `StateRepository.fetchState` async function first,
 //! and then
 //! delegate the command to the decider which can produce new state as a result. New state is then stored
 //! via `StateRepository.save` async function.
@@ -91,11 +93,41 @@
 //! [materialized_view::MaterializedView] is using/delegating a `View` to handle events of type `E` and to maintain
 //! a state of denormalized
 //! projection(s) as a
-//! result. Essentially, it represents the query/view side of the CQRS pattern. It belongs to the Application layer.
+//! result. Essentially, it represents the query/view side of the CQRS pattern.
+//!
+//! It belongs to the Application layer.
 //!
 //! In order to handle the event, materialized view needs to fetch the current state via `ViewStateRepository.fetchState`
 //! suspending function first, and then delegate the event to the view, which can produce new state as a result. New state
 //! is then stored via `ViewStateRepository.save` suspending function.
+//!
+//!
+//! ## Saga
+//!
+//! `Saga` is a datatype that represents the central point of control, deciding what to execute next (`A`), based on the action result (`AR`).
+//! It has two generic parameters `AR`/Action Result, `A`/Action , representing the type of the values that Saga may contain or use.
+//! `'a` is used as a lifetime parameter, indicating that all references contained within the struct (e.g., references within the function closures) must have a lifetime that is at least as long as 'a.
+//!
+//! `Saga` is a pure domain component.
+//!
+//! - `AR` - Action Result/Event
+//! - `A` - Action/Command
+//!
+//! ```rust
+//! pub type ReactFunction<'a, AR, A> = Box<dyn Fn(&AR) -> Vec<A> + 'a + Send + Sync>;
+//! pub struct Saga<'a, AR: 'a, A: 'a> {
+//!     pub react: ReactFunction<'a, AR, A>,
+//! }
+//! ```
+//!
+//! ### Saga Manager
+//!
+//! [saga_manager::SagaManager] is using/delegating a `Saga` to react to the action result and to publish the new actions.
+//!
+//! It belongs to the Application layer.
+//!
+//! It is using a [saga::Saga] to react to the action result and to publish the new actions.
+//! It is using an [saga_manager::ActionPublisher] to publish the new actions.
 //!
 //! ## FModel in other languages
 //!
