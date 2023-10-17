@@ -216,7 +216,7 @@ pub struct OrderCancelledEvent {
 
 ```
 
-## `S` / State / Current state of the system/aggregate/entity
+### `S` / State / Current state of the system/aggregate/entity
 
 ```rust
 struct OrderState {

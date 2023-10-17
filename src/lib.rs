@@ -129,6 +129,15 @@
 //! It is using a [saga::Saga] to react to the action result and to publish the new actions.
 //! It is using an [saga_manager::ActionPublisher] to publish the new actions.
 //!
+//! ## Examples
+//!
+//! - [Gift Card Demo - with Axon](https://github.com/AxonIQ/axon-rust/tree/main/gift-card-rust)
+//! - [FModel Rust Tests](https://github.com/fraktalio/fmodel-rust/tree/main/tests)
+//!
+//! ## GitHub
+//!
+//! - [FModel Rust](https://github.com/fraktalio/fmodel-rust)
+//!
 //! ## FModel in other languages
 //!
 //!  - [FModel Kotlin](https://github.com/fraktalio/fmodel/)
