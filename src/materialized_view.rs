@@ -21,7 +21,7 @@ pub trait ViewStateRepository<E, S, Error> {
 
 /// Materialized View.
 ///
-/// It is using a [View] / [ViewStateComputation] to compute new state based on the current state and the event.
+/// It is using a `View` / [ViewStateComputation] to compute new state based on the current state and the event.
 /// It is using a [ViewStateRepository] to fetch the current state and to save the new state.
 ///
 /// Generic parameters:

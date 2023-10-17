@@ -26,7 +26,7 @@ pub trait EventRepository<C, E, Version, Error> {
 
 /// Event Sourced Aggregate.
 ///
-/// It is using a [Decider] / [EventComputation] to compute new events based on the current events and the command.
+/// It is using a `Decider` / [EventComputation] to compute new events based on the current events and the command.
 /// It is using a [EventRepository] to fetch the current events and to save the new events.
 ///
 /// Generic parameters:
@@ -95,7 +95,7 @@ pub trait StateRepository<C, S, Version, Error> {
 
 /// State Stored Aggregate.
 ///
-/// It is using a [Decider] / [StateComputation] to compute new state based on the current state and the command.
+/// It is using a `Decider` / [StateComputation] to compute new state based on the current state and the command.
 /// It is using a [StateRepository] to fetch the current state and to save the new state.
 ///
 /// Generic parameters:

@@ -1,6 +1,6 @@
 use crate::ReactFunction;
 
-/// [Saga] is a datatype that represents the central point of control, deciding what to execute next ([A]), based on the action result ([AR]).
+/// [Saga] is a datatype that represents the central point of control, deciding what to execute next (`A`), based on the action result (`AR`).
 /// It has two generic parameters `AR`/Action Result, `A`/Action , representing the type of the values that Saga may contain or use.
 /// `'a` is used as a lifetime parameter, indicating that all references contained within the struct (e.g., references within the function closures) must have a lifetime that is at least as long as 'a.
 ///
