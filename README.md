@@ -542,6 +542,12 @@ Or add the following line to your `Cargo.toml` file:
 fmodel-rust = "0.2.0"
 ```
 
+## Examples
+
+- [Gift Card Demo - with Axon](https://github.com/AxonIQ/axon-rust/tree/main/gift-card-rust)
+- [Tests](tests)
+
+
 ## FModel in other languages
 
  - [FModel Kotlin](https://github.com/fraktalio/fmodel/)
