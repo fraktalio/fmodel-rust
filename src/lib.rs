@@ -5,8 +5,8 @@
 //! The abstractions that you design, the behaviors that you implement, and the UI interactions that you build all reflect
 //! the business — together, they constitute the model of the domain.
 //!
-//! ![event-modeling](https://github.com/fraktalio/fmodel-ts/raw/main/.assets/event-modeling.png)
-//
+//! ![event-modeling](https://!github.com/fraktalio/fmodel-ts/raw/main/.assets/event-modeling.png)
+//!
 //! ## `IOR<Library, Inspiration>`
 //!
 //! This crate can be used as a library, or as an inspiration, or both. It provides just enough tactical Domain-Driven
@@ -130,28 +130,179 @@
 //! It is using a [saga::Saga] to react to the action result and to publish the new actions.
 //! It is using an [saga_manager::ActionPublisher] to publish the new actions.
 //!
+//! ## Clear separation between data and behaviour
+//!
+//!```rust
+//! use fmodel_rust::decider::Decider;
+//! // ## Algebraic Data Types
+//! //
+//! // In Rust, we can use ADTs to model our application's domain entities and relationships in a functional way, clearly defining the set of possible values and states.
+//! // Rust has two main types of ADTs: `enum` and `struct`.
+//! //
+//! // - `enum` is used to define a type that can take on one of several possible variants - modeling a `sum/OR` type.
+//! // - `struct` is used to express a type that has named fields - modeling a `product/AND` type.
+//! //
+//! // ADTs will help with
+//! //
+//! // - representing the business domain in the code accurately
+//! // - enforcing correctness
+//! // - reducing the likelihood of bugs.
+//!
+//!
+//! // ### `C` / Command / Intent to change the state of the system
+//!
+//! // models Sum/Or type / multiple possible variants
+//! pub enum OrderCommand {
+//!     Create(CreateOrderCommand),
+//!     Update(UpdateOrderCommand),
+//!     Cancel(CancelOrderCommand),
+//! }
+//! // models Product/And type / a concrete variant, consisting of named fields
+//! pub struct CreateOrderCommand {
+//!     pub order_id: u32,
+//!     pub customer_name: String,
+//!     pub items: Vec<String>,
+//! }
+//! // models Product/And type / a concrete variant, consisting of named fields
+//! pub struct UpdateOrderCommand {
+//!     pub order_id: u32,
+//!     pub new_items: Vec<String>,
+//! }
+//! // models Product/And type / a concrete variant, consisting of named fields
+//! pub struct CancelOrderCommand {
+//!     pub order_id: u32,
+//! }
+//!
+//! // ### `E` / Event / Fact
+//!
+//! // models Sum/Or type / multiple possible variants
+//! pub enum OrderEvent {
+//!     Created(OrderCreatedEvent),
+//!     Updated(OrderUpdatedEvent),
+//!     Cancelled(OrderCancelledEvent),
+//! }
+//! // models Product/And type / a concrete variant, consisting of named fields
+//! pub struct OrderCreatedEvent {
+//!     pub order_id: u32,
+//!     pub customer_name: String,
+//!     pub items: Vec<String>,
+//! }
+//! // models Product/And type / a concrete variant, consisting of named fields
+//! pub struct OrderUpdatedEvent {
+//!     pub order_id: u32,
+//!     pub updated_items: Vec<String>,
+//! }
+//! // models Product/And type / a concrete variant, consisting of named fields
+//! pub struct OrderCancelledEvent {
+//!     pub order_id: u32,
+//! }
+//!
+//! // ### `S` / State / Current state of the system/aggregate/entity
+//! #[derive(Clone)]
+//! struct OrderState {
+//!     order_id: u32,
+//!     customer_name: String,
+//!     items: Vec<String>,
+//!     is_cancelled: bool,
+//! }
+//!
+//! // ## Modeling the Behaviour of our domain
+//! //
+//! //  - algebraic data types form the structure of our entities (commands, state, and events).
+//! //  - functions/lambda offers the algebra of manipulating the entities in a compositional manner, effectively modeling the behavior.
+//! //
+//! // This leads to modularity in design and a clear separation of the entity’s structure and functions/behaviour of the entity.
+//! //
+//! // Fmodel library offers generic and abstract components to specialize in for your specific case/expected behavior
+//!
+//! fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
+//!     Decider {
+//!         // Your decision logic goes here.
+//!         decide: Box::new(|command, state| match command {
+//!             // Exhaustive pattern matching on the command
+//!             OrderCommand::Create(create_cmd) => {
+//!                 vec![OrderEvent::Created(OrderCreatedEvent {
+//!                     order_id: create_cmd.order_id,
+//!                     customer_name: create_cmd.customer_name.to_owned(),
+//!                     items: create_cmd.items.to_owned(),
+//!                 })]
+//!             }
+//!             OrderCommand::Update(update_cmd) => {
+//!                 // Your validation logic goes here
+//!                 if state.order_id == update_cmd.order_id {
+//!                     vec![OrderEvent::Updated(OrderUpdatedEvent {
+//!                         order_id: update_cmd.order_id,
+//!                         updated_items: update_cmd.new_items.to_owned(),
+//!                     })]
+//!                 } else {
+//!                     // In case of validation failure, return empty list of events or error event
+//!                     vec![]
+//!                 }
+//!             }
+//!             OrderCommand::Cancel(cancel_cmd) => {
+//!                 // Your validation logic goes here
+//!                 if state.order_id == cancel_cmd.order_id {
+//!                     vec![OrderEvent::Cancelled(OrderCancelledEvent {
+//!                         order_id: cancel_cmd.order_id,
+//!                     })]
+//!                 } else {
+//!                     // In case of validation failure, return empty list of events or error event
+//!                     vec![]
+//!                 }
+//!             }
+//!         }),
+//!         // Evolve the state based on the event(s)
+//!         evolve: Box::new(|state, event| {
+//!             let mut new_state = state.clone();
+//!             // Exhaustive pattern matching on the event
+//!             match event {
+//!                 OrderEvent::Created(created_event) => {
+//!                     new_state.order_id = created_event.order_id;
+//!                     new_state.customer_name = created_event.customer_name.to_owned();
+//!                     new_state.items = created_event.items.to_owned();
+//!                 }
+//!                 OrderEvent::Updated(updated_event) => {
+//!                     new_state.items = updated_event.updated_items.to_owned();
+//!                 }
+//!                 OrderEvent::Cancelled(_) => {
+//!                     new_state.is_cancelled = true;
+//!                 }
+//!             }
+//!             new_state
+//!         }),
+//!         // Initial state
+//!         initial_state: Box::new(|| OrderState {
+//!             order_id: 0,
+//!             customer_name: "".to_string(),
+//!             items: Vec::new(),
+//!             is_cancelled: false,
+//!         }),
+//!     }
+//! }
+//! ```
+//!
 //! ## Examples
 //!
-//! - [Gift Card Demo - with Axon](https://github.com/AxonIQ/axon-rust/tree/main/gift-card-rust)
-//! - [FModel Rust Tests](https://github.com/fraktalio/fmodel-rust/tree/main/tests)
+//! - [Gift Card Demo - with Axon](https://!github.com/AxonIQ/axon-rust/tree/main/gift-card-rust)
+//! - [FModel Rust Tests](https://!github.com/fraktalio/fmodel-rust/tree/main/tests)
 //!
 //! ## GitHub
 //!
-//! - [FModel Rust](https://github.com/fraktalio/fmodel-rust)
+//! - [FModel Rust](https://!github.com/fraktalio/fmodel-rust)
 //!
 //! ## FModel in other languages
 //!
-//!  - [FModel Kotlin](https://github.com/fraktalio/fmodel/)
-//!  - [FModel TypeScript](https://github.com/fraktalio/fmodel-ts/)
-//!  - [FModel Java](https://github.com/fraktalio/fmodel-java/)
+//!  - [FModel Kotlin](https://!github.com/fraktalio/fmodel/)
+//!  - [FModel TypeScript](https://!github.com/fraktalio/fmodel-ts/)
+//!  - [FModel Java](https://!github.com/fraktalio/fmodel-java/)
 //!
 //! ## Credits
 //!
-//! Special credits to `Jérémie Chassaing` for sharing his [research](https://www.youtube.com/watch?v=kgYGMVDHQHs)
+//! Special credits to `Jérémie Chassaing` for sharing his [research](https://!www.youtube.com/watch?v=kgYGMVDHQHs)
 //! and `Adam Dymitruk` for hosting the meetup.
 //!
 //! ---
-//! Created with `love` by [Fraktalio](https://fraktalio.com/)
+//! Created with `love` by [Fraktalio](https://!fraktalio.com/)
 
 /// Aggregate module - belongs to the Application layer.
 pub mod aggregate;
