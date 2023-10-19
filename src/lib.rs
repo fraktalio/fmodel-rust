@@ -5,12 +5,14 @@
 //! The abstractions that you design, the behaviors that you implement, and the UI interactions that you build all reflect
 //! the business — together, they constitute the model of the domain.
 //!
-//! ![event-modeling](https://!github.com/fraktalio/fmodel-ts/raw/main/.assets/event-modeling.png)
+//! ![event-modeling](https://github.com/fraktalio/fmodel-ts/raw/main/.assets/event-modeling.png)
 //!
 //! ## `IOR<Library, Inspiration>`
 //!
 //! This crate can be used as a library, or as an inspiration, or both. It provides just enough tactical Domain-Driven
 //! Design patterns, optimised for Event Sourcing and CQRS.
+//!
+//! ![onion architecture image](https://github.com/fraktalio/fmodel/blob/d8643a7d0de30b79f0b904f7a40233419c463fc8/.assets/onion.png?raw=true)
 //!
 //!## Decider
 //!
@@ -304,17 +306,17 @@
 //! ---
 //! Created with `love` by [Fraktalio](https://!fraktalio.com/)
 
-/// Aggregate module - belongs to the Application layer.
+/// Aggregate module - belongs to the `Application` layer - composes pure logic and effects (fetching, storing)
 pub mod aggregate;
-/// Decider module - belongs to the Domain layer.
+/// Decider module - belongs to the `Domain` layer - pure decision making component - pure logic
 pub mod decider;
-/// Materialized View module - belongs to the Application layer.
+/// Materialized View module - belongs to the `Application` layer - composes pure event handling algorithm and effects (fetching, storing)
 pub mod materialized_view;
-/// Saga module - belongs to the Domain layer.
+/// Saga module - belongs to the `Domain` layer - pure mapper of action results/events into new actions/commands
 pub mod saga;
-/// Saga Manager module - belongs to the Application layer.
+/// Saga Manager module - belongs to the `Application` layer - composes pure saga and effects (publishing)
 pub mod saga_manager;
-/// View module - belongs to the Domain layer.
+/// View module - belongs to the `Domain` layer - pure event handling algorithm
 pub mod view;
 
 /// The [DecideFunction] function is used to decide which events to produce based on the command and the current state.
