@@ -12,6 +12,7 @@ use crate::saga::Saga;
 /// - `Error` - error
 #[async_trait]
 pub trait ActionPublisher<A, Error> {
+    /// Publishes the action/command to some external system, returning either the actions that are successfully published or error.
     async fn publish(&self, action: &[A]) -> Result<Vec<A>, Error>;
 }
 
@@ -38,6 +39,7 @@ impl<'a, A, AR, Publisher, Error> SagaManager<'a, A, AR, Publisher, Error>
 where
     Publisher: ActionPublisher<A, Error>,
 {
+    /// Creates a new instance of [SagaManager].
     pub fn new(action_publisher: Publisher, saga: Saga<'a, AR, A>) -> Self {
         SagaManager {
             action_publisher,

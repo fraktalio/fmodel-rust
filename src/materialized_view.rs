@@ -46,6 +46,7 @@ where
     Repository: ViewStateRepository<E, S, Error>,
     View: ViewStateComputation<E, S>,
 {
+    /// Creates a new instance of [MaterializedView].
     pub fn new(repository: Repository, view: View) -> Self {
         MaterializedView {
             repository,

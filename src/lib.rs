@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! # FModel Rust
 //!
 //! When you’re developing an information system to automate the activities of the business, you are modeling the business.
@@ -152,11 +153,17 @@
 //! ---
 //! Created with `love` by [Fraktalio](https://fraktalio.com/)
 
+/// Aggregate module - belongs to the Application layer.
 pub mod aggregate;
+/// Decider module - belongs to the Domain layer.
 pub mod decider;
+/// Materialized View module - belongs to the Application layer.
 pub mod materialized_view;
+/// Saga module - belongs to the Domain layer.
 pub mod saga;
+/// Saga Manager module - belongs to the Application layer.
 pub mod saga_manager;
+/// View module - belongs to the Domain layer.
 pub mod view;
 
 /// The [DecideFunction] function is used to decide which events to produce based on the command and the current state.

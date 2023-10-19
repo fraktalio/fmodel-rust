@@ -126,6 +126,7 @@ impl<'a, S, E> View<'a, S, E> {
     }
 }
 
+/// Formalizes the `State Computation` algorithm for the `view` to handle events based on the current state, and produce new state.
 pub trait ViewStateComputation<E, S> {
     /// Computes new state based on the current state and the events.
     fn compute_new_state(&self, current_state: Option<S>, events: &[&E]) -> S;
