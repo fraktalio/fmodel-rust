@@ -54,6 +54,7 @@ pub fn combine<'a, C1, S1: Clone, E1, C2, S2: Clone, E2>(
 
 /// Combine three deciders into one bigger decider
 /// Creates a new instance of a Decider by combining two deciders of type `C1`, `S1`, `E1` ,  `C2`, `S2`, `E2`, and `C3`, `S3`, `E3` into a new decider of type `Sum3<C, C2, C3>`, `(S, S2, S3)`, `Sum3<E, E2, E3>`
+#[allow(clippy::type_complexity)]
 pub fn combine3<'a, C1, S1: Clone, E1, C2, S2: Clone, E2, C3, S3: Clone, E3>(
     decider1: &'a Decider<'a, C1, S1, E1>,
     decider2: &'a Decider<'a, C2, S2, E2>,

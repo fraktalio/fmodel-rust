@@ -1,5 +1,5 @@
 // Order API
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum OrderCommand {
     Create(CreateOrderCommand),
@@ -7,20 +7,20 @@ pub enum OrderCommand {
     Cancel(CancelOrderCommand),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CreateOrderCommand {
     pub order_id: u32,
     pub customer_name: String,
     pub items: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UpdateOrderCommand {
     pub order_id: u32,
     pub new_items: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CancelOrderCommand {
     pub order_id: u32,
 }
@@ -82,6 +82,19 @@ pub enum ShipmentCommand {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CreateShipmentCommand {
+    pub shipment_id: u32,
+    pub order_id: u32,
+    pub customer_name: String,
+    pub items: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+#[allow(dead_code)]
+pub enum ShipmentEvent {
+    Created(ShipmentCreatedEvent),
+}
+#[derive(Debug, PartialEq, Clone)]
+pub struct ShipmentCreatedEvent {
     pub shipment_id: u32,
     pub order_id: u32,
     pub customer_name: String,
