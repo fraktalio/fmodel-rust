@@ -115,3 +115,16 @@ impl<'a, AR, A> Saga<'a, AR, A> {
         Saga { react: new_react }
     }
 }
+
+/// Formalizes the `Action Computation` algorithm for the `saga` to handle events/action_results, and produce new commands/actions.
+pub trait ActionComputation<AR, A> {
+    /// Computes new commands/actions based on the event/action_result.
+    fn compute_new_actions(&self, event: &AR) -> Vec<A>;
+}
+
+impl<'a, AR, A> ActionComputation<AR, A> for Saga<'a, AR, A> {
+    /// Computes new commands/actions based on the event/action_result.
+    fn compute_new_actions(&self, event: &AR) -> Vec<A> {
+        (self.react)(event).into_iter().collect()
+    }
+}
