@@ -310,6 +310,8 @@
 pub mod aggregate;
 /// Decider module - belongs to the `Domain` layer - pure decision making component - pure logic
 pub mod decider;
+/// Additional functions on the Decider
+mod decider_combined;
 /// Materialized View module - belongs to the `Application` layer - composes pure event handling algorithm and effects (fetching, storing)
 pub mod materialized_view;
 /// Saga module - belongs to the `Domain` layer - pure mapper of action results/events into new actions/commands
@@ -327,3 +329,21 @@ pub type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>;
 pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a + Send + Sync>;
 /// The [ReactFunction] function is used to decide what actions/A to execute next based on the action result/AR.
 pub type ReactFunction<'a, AR, A> = Box<dyn Fn(&AR) -> Vec<A> + 'a + Send + Sync>;
+
+/// Define the generic Combined/Sum Enum
+pub enum Sum<A, B> {
+    /// First variant
+    First(A),
+    /// Second variant
+    Second(B),
+}
+
+/// Define the generic Combined/Sum Enum
+pub enum Sum3<A, B, C> {
+    /// First variant
+    First(A),
+    /// Second variant
+    Second(B),
+    /// Third variant
+    Third(C),
+}
