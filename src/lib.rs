@@ -306,6 +306,8 @@
 //! ---
 //! Created with `love` by [Fraktalio](https://!fraktalio.com/)
 
+use serde::{Deserialize, Serialize};
+
 /// Aggregate module - belongs to the `Application` layer - composes pure logic and effects (fetching, storing)
 pub mod aggregate;
 /// Decider module - belongs to the `Domain` layer - pure decision making component - pure logic
@@ -331,7 +333,7 @@ pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a + Send + Sync>;
 pub type ReactFunction<'a, AR, A> = Box<dyn Fn(&AR) -> Vec<A> + 'a + Send + Sync>;
 
 /// Define the generic Combined/Sum Enum
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Sum<A, B> {
     /// First variant
     First(A),

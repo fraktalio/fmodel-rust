@@ -7,6 +7,8 @@ license = "Apache-2.0"
 
 [dependencies]
 async-trait = "0.1.74"
+serde = {version = "1.0.193", features = ["derive"]}
+
 
 [dev-dependencies]
 derive_more = "0.99.17"
