@@ -1,4 +1,4 @@
-use fmodel_rust::saga::Saga;
+use fmodel_rust::saga::{ActionComputation, Saga};
 use fmodel_rust::saga_combined::combine;
 use fmodel_rust::Sum;
 
@@ -54,7 +54,7 @@ fn test() {
         customer_name: "John Doe".to_string(),
         items: vec!["Item 1".to_string(), "Item 2".to_string()],
     });
-    let commands = (order_saga.react)(&order_created_event);
+    let commands = order_saga.compute_new_actions(&order_created_event);
     assert_eq!(
         commands,
         [ShipmentCommand::Create(CreateShipmentCommand {
@@ -64,7 +64,7 @@ fn test() {
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
         })]
     );
-    let combined_commands = (combined_saga.react)(&Sum::First(order_created_event));
+    let combined_commands = combined_saga.compute_new_actions(&Sum::First(order_created_event));
     assert_eq!(
         combined_commands,
         [Sum::First(ShipmentCommand::Create(CreateShipmentCommand {
