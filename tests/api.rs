@@ -1,5 +1,5 @@
 // Order API
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum OrderCommand {
     Create(CreateOrderCommand),
@@ -7,20 +7,20 @@ pub enum OrderCommand {
     Cancel(CancelOrderCommand),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CreateOrderCommand {
     pub order_id: u32,
     pub customer_name: String,
     pub items: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UpdateOrderCommand {
     pub order_id: u32,
     pub new_items: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CancelOrderCommand {
     pub order_id: u32,
 }
@@ -32,6 +32,15 @@ impl OrderCommand {
             OrderCommand::Create(c) => c.order_id.to_owned(),
             OrderCommand::Update(c) => c.order_id.to_owned(),
             OrderCommand::Cancel(c) => c.order_id.to_owned(),
+        }
+    }
+}
+
+impl ShipmentCommand {
+    #[allow(dead_code)]
+    pub fn id(&self) -> u32 {
+        match self {
+            ShipmentCommand::Create(c) => c.shipment_id.to_owned(),
         }
     }
 }
@@ -72,6 +81,14 @@ impl OrderEvent {
         }
     }
 }
+impl ShipmentEvent {
+    #[allow(dead_code)]
+    pub fn id(&self) -> u32 {
+        match self {
+            ShipmentEvent::Created(c) => c.shipment_id.to_owned(),
+        }
+    }
+}
 
 // Shipment API
 #[derive(Debug, PartialEq, Clone)]
@@ -82,6 +99,19 @@ pub enum ShipmentCommand {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CreateShipmentCommand {
+    pub shipment_id: u32,
+    pub order_id: u32,
+    pub customer_name: String,
+    pub items: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+#[allow(dead_code)]
+pub enum ShipmentEvent {
+    Created(ShipmentCreatedEvent),
+}
+#[derive(Debug, PartialEq, Clone)]
+pub struct ShipmentCreatedEvent {
     pub shipment_id: u32,
     pub order_id: u32,
     pub customer_name: String,

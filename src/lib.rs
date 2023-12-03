@@ -306,18 +306,26 @@
 //! ---
 //! Created with `love` by [Fraktalio](https://!fraktalio.com/)
 
+use serde::{Deserialize, Serialize};
+
 /// Aggregate module - belongs to the `Application` layer - composes pure logic and effects (fetching, storing)
 pub mod aggregate;
 /// Decider module - belongs to the `Domain` layer - pure decision making component - pure logic
 pub mod decider;
+/// Additional functions on the Decider - combine multiple deciders into one - belongs to the `Domain` layer
+pub mod decider_combined;
 /// Materialized View module - belongs to the `Application` layer - composes pure event handling algorithm and effects (fetching, storing)
 pub mod materialized_view;
 /// Saga module - belongs to the `Domain` layer - pure mapper of action results/events into new actions/commands
 pub mod saga;
+/// Additional functions on the Saga - combine multiple sagas into one - belongs to the `Domain` layer
+pub mod saga_combined;
 /// Saga Manager module - belongs to the `Application` layer - composes pure saga and effects (publishing)
 pub mod saga_manager;
 /// View module - belongs to the `Domain` layer - pure event handling algorithm
 pub mod view;
+/// Additional functions on the View - combine multiple views into one - belongs to the `Domain` layer
+pub mod view_combined;
 
 /// The [DecideFunction] function is used to decide which events to produce based on the command and the current state.
 pub type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>;
@@ -327,3 +335,23 @@ pub type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>;
 pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a + Send + Sync>;
 /// The [ReactFunction] function is used to decide what actions/A to execute next based on the action result/AR.
 pub type ReactFunction<'a, AR, A> = Box<dyn Fn(&AR) -> Vec<A> + 'a + Send + Sync>;
+
+/// Define the generic Combined/Sum Enum
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum Sum<A, B> {
+    /// First variant
+    First(A),
+    /// Second variant
+    Second(B),
+}
+
+/// Define the generic Combined/Sum Enum
+#[derive(Debug, PartialEq, Clone)]
+pub enum Sum3<A, B, C> {
+    /// First variant
+    First(A),
+    /// Second variant
+    Second(B),
+    /// Third variant
+    Third(C),
+}
