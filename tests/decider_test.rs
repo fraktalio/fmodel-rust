@@ -118,9 +118,10 @@ fn shipment_decider<'a>() -> Decider<'a, ShipmentCommand, ShipmentState, Shipmen
 #[test]
 fn test() {
     let order_decider: Decider<OrderCommand, OrderState, OrderEvent> = order_decider();
-    let shpiment_decider: Decider<ShipmentCommand, ShipmentState, ShipmentEvent> =
+    let order_decider2: Decider<OrderCommand, OrderState, OrderEvent> = crate::order_decider();
+    let shpiment_decider2: Decider<ShipmentCommand, ShipmentState, ShipmentEvent> =
         shipment_decider();
-    let combined_decider = combine(&order_decider, &shpiment_decider);
+    let combined_decider = combine(order_decider2, shpiment_decider2);
 
     let create_order_command = OrderCommand::Create(CreateOrderCommand {
         order_id: 1,

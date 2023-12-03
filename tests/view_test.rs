@@ -79,8 +79,9 @@ fn shipment_view<'a>() -> View<'a, ShipmentViewState, ShipmentEvent> {
 #[test]
 fn test() {
     let order_view: View<OrderViewState, OrderEvent> = order_view();
+    let order_view2: View<OrderViewState, OrderEvent> = crate::order_view();
     let shipment_view: View<ShipmentViewState, ShipmentEvent> = shipment_view();
-    let combined_view = combine(&order_view, &shipment_view);
+    let combined_view = combine(order_view2, shipment_view);
 
     let order_created_event = OrderEvent::Created(OrderCreatedEvent {
         order_id: 1,

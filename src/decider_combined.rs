@@ -4,8 +4,8 @@ use crate::{Sum, Sum3};
 /// Combine two deciders into one bigger decider
 /// Creates a new instance of a Decider by combining two deciders of type `C1`, `S1`, `E1` and `C2`, `S2`, `E2` into a new decider of type `Sum<C, C2>`, `(S, S2)`, `Sum<E, E2>`
 pub fn combine<'a, C1, S1: Clone, E1, C2, S2: Clone, E2>(
-    decider1: &'a Decider<'a, C1, S1, E1>,
-    decider2: &'a Decider<'a, C2, S2, E2>,
+    decider1: Decider<'a, C1, S1, E1>,
+    decider2: Decider<'a, C2, S2, E2>,
 ) -> Decider<'a, Sum<C1, C2>, (S1, S2), Sum<E1, E2>> {
     let new_decide = Box::new(move |c: &Sum<C1, C2>, s: &(S1, S2)| match c {
         Sum::First(c) => {
@@ -56,9 +56,9 @@ pub fn combine<'a, C1, S1: Clone, E1, C2, S2: Clone, E2>(
 /// Creates a new instance of a Decider by combining two deciders of type `C1`, `S1`, `E1` ,  `C2`, `S2`, `E2`, and `C3`, `S3`, `E3` into a new decider of type `Sum3<C, C2, C3>`, `(S, S2, S3)`, `Sum3<E, E2, E3>`
 #[allow(clippy::type_complexity)]
 pub fn combine3<'a, C1, S1: Clone, E1, C2, S2: Clone, E2, C3, S3: Clone, E3>(
-    decider1: &'a Decider<'a, C1, S1, E1>,
-    decider2: &'a Decider<'a, C2, S2, E2>,
-    decider3: &'a Decider<'a, C3, S3, E3>,
+    decider1: Decider<'a, C1, S1, E1>,
+    decider2: Decider<'a, C2, S2, E2>,
+    decider3: Decider<'a, C3, S3, E3>,
 ) -> Decider<'a, Sum3<C1, C2, C3>, (S1, S2, S3), Sum3<E1, E2, E3>> {
     let new_decide = Box::new(move |c: &Sum3<C1, C2, C3>, s: &(S1, S2, S3)| match c {
         Sum3::First(c) => {

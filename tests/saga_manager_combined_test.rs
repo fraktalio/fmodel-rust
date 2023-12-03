@@ -1,6 +1,10 @@
+use async_trait::async_trait;
+use derive_more::Display;
 use fmodel_rust::saga::Saga;
 use fmodel_rust::saga_combined::combine;
+use fmodel_rust::saga_manager::{ActionPublisher, SagaManager};
 use fmodel_rust::Sum;
+use std::error::Error;
 
 use crate::api::{
     CreateShipmentCommand, OrderCommand, OrderCreatedEvent, OrderEvent, ShipmentCommand,
@@ -43,31 +47,54 @@ fn shipment_saga<'a>() -> Saga<'a, ShipmentEvent, OrderCommand> {
     }
 }
 
-#[test]
-fn test() {
-    let order_saga: Saga<OrderEvent, ShipmentCommand> = order_saga();
-    let order_saga2: Saga<OrderEvent, ShipmentCommand> = crate::order_saga();
-    let shipment_saga: Saga<ShipmentEvent, OrderCommand> = shipment_saga();
-    let combined_saga = combine(order_saga2, shipment_saga);
-    let order_created_event = OrderEvent::Created(OrderCreatedEvent {
+/// Error type for the saga manager
+#[derive(Debug, Display)]
+#[allow(dead_code)]
+enum SagaManagerError {
+    PublishAction(String),
+}
+
+impl Error for SagaManagerError {}
+
+/// Simple action publisher that just returns the action/command.
+/// It is used for testing. In real life, it would publish the action/command to some external system. or to an aggregate that is able to handel the action/command.
+struct SimpleActionPublisher;
+
+impl SimpleActionPublisher {
+    fn new() -> Self {
+        SimpleActionPublisher {}
+    }
+}
+
+#[async_trait]
+impl ActionPublisher<Sum<ShipmentCommand, OrderCommand>, SagaManagerError>
+    for SimpleActionPublisher
+{
+    async fn publish(
+        &self,
+        action: &[Sum<ShipmentCommand, OrderCommand>],
+    ) -> Result<Vec<Sum<ShipmentCommand, OrderCommand>>, SagaManagerError> {
+        Ok(Vec::from(action))
+    }
+}
+
+#[tokio::test]
+async fn test() {
+    let order_created_event = Sum::First(OrderEvent::Created(OrderCreatedEvent {
         order_id: 1,
         customer_name: "John Doe".to_string(),
         items: vec!["Item 1".to_string(), "Item 2".to_string()],
-    });
-    let commands = (order_saga.react)(&order_created_event);
-    assert_eq!(
-        commands,
-        [ShipmentCommand::Create(CreateShipmentCommand {
-            shipment_id: 1,
-            order_id: 1,
-            customer_name: "John Doe".to_string(),
-            items: vec!["Item 1".to_string(), "Item 2".to_string()],
-        })]
+    }));
+
+    let saga_manager = SagaManager::new(
+        SimpleActionPublisher::new(),
+        combine(order_saga(), shipment_saga()),
     );
-    let combined_commands = (combined_saga.react)(&Sum::First(order_created_event));
+    let result = saga_manager.handle(&order_created_event).await;
+    assert!(result.is_ok());
     assert_eq!(
-        combined_commands,
-        [Sum::First(ShipmentCommand::Create(CreateShipmentCommand {
+        result.unwrap(),
+        vec![Sum::First(ShipmentCommand::Create(CreateShipmentCommand {
             shipment_id: 1,
             order_id: 1,
             customer_name: "John Doe".to_string(),

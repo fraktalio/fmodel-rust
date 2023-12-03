@@ -36,6 +36,15 @@ impl OrderCommand {
     }
 }
 
+impl ShipmentCommand {
+    #[allow(dead_code)]
+    pub fn id(&self) -> u32 {
+        match self {
+            ShipmentCommand::Create(c) => c.shipment_id.to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum OrderEvent {
@@ -69,6 +78,14 @@ impl OrderEvent {
             OrderEvent::Created(c) => c.order_id.to_owned(),
             OrderEvent::Updated(c) => c.order_id.to_owned(),
             OrderEvent::Cancelled(c) => c.order_id.to_owned(),
+        }
+    }
+}
+impl ShipmentEvent {
+    #[allow(dead_code)]
+    pub fn id(&self) -> u32 {
+        match self {
+            ShipmentEvent::Created(c) => c.shipment_id.to_owned(),
         }
     }
 }

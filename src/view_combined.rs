@@ -4,8 +4,8 @@ use crate::{Sum, Sum3};
 /// Combine two views into one.
 /// Creates a new instance of a View by combining two views of type `S1`, `E1` and `S2`, `E2` into a new view of type `(S1, S2)`, `Sum<E1, E2>`
 pub fn combine<'a, S1: Clone, E1, S2: Clone, E2>(
-    view1: &'a View<'a, S1, E1>,
-    view2: &'a View<'a, S2, E2>,
+    view1: View<'a, S1, E1>,
+    view2: View<'a, S2, E2>,
 ) -> View<'a, (S1, S2), Sum<E1, E2>> {
     let new_evolve = Box::new(move |s: &(S1, S2), e: &Sum<E1, E2>| match e {
         Sum::First(e) => {
@@ -35,9 +35,9 @@ pub fn combine<'a, S1: Clone, E1, S2: Clone, E2>(
 /// Combine three views into one.
 /// Creates a new instance of a View by combining three views of type `S1`, `E1` ,  `S2`, `E2`, and `S3`, `E3` into a new view of type `(S1, S2, S3)`, `Sum3<E1, E2, E3>`
 pub fn combine3<'a, S1: Clone, E1, S2: Clone, E2, S3: Clone, E3>(
-    view1: &'a View<'a, S1, E1>,
-    view2: &'a View<'a, S2, E2>,
-    view3: &'a View<'a, S3, E3>,
+    view1: View<'a, S1, E1>,
+    view2: View<'a, S2, E2>,
+    view3: View<'a, S3, E3>,
 ) -> View<'a, (S1, S2, S3), Sum3<E1, E2, E3>> {
     let new_evolve = Box::new(move |s: &(S1, S2, S3), e: &Sum3<E1, E2, E3>| match e {
         Sum3::First(e) => {
