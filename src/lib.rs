@@ -312,16 +312,20 @@ use serde::{Deserialize, Serialize};
 pub mod aggregate;
 /// Decider module - belongs to the `Domain` layer - pure decision making component - pure logic
 pub mod decider;
-/// Additional functions on the Decider
+/// Additional functions on the Decider - combine multiple deciders into one - belongs to the `Domain` layer
 pub mod decider_combined;
 /// Materialized View module - belongs to the `Application` layer - composes pure event handling algorithm and effects (fetching, storing)
 pub mod materialized_view;
 /// Saga module - belongs to the `Domain` layer - pure mapper of action results/events into new actions/commands
 pub mod saga;
+/// Additional functions on the Saga - combine multiple sagas into one - belongs to the `Domain` layer
+pub mod saga_combined;
 /// Saga Manager module - belongs to the `Application` layer - composes pure saga and effects (publishing)
 pub mod saga_manager;
 /// View module - belongs to the `Domain` layer - pure event handling algorithm
 pub mod view;
+/// Additional functions on the View - combine multiple views into one - belongs to the `Domain` layer
+pub mod view_combined;
 
 /// The [DecideFunction] function is used to decide which events to produce based on the command and the current state.
 pub type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>;
