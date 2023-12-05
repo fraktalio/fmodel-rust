@@ -544,6 +544,7 @@ fmodel-rust = "0.4.0"
 
 ## Examples
 
+- [Restaurant Demo - with Postgres](https://github.com/fraktalio/fmodel-rust-demo)
 - [Gift Card Demo - with Axon](https://github.com/AxonIQ/axon-rust/tree/main/gift-card-rust)
 - [Tests](tests)
 
