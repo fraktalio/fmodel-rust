@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use derive_more::Display;
 use fmodel_rust::saga::Saga;
-use fmodel_rust::saga_combined::combine;
 use fmodel_rust::saga_manager::{ActionPublisher, SagaManager};
 use fmodel_rust::Sum;
 use std::error::Error;
@@ -80,7 +79,7 @@ impl ActionPublisher<Sum<ShipmentCommand, OrderCommand>, SagaManagerError>
 
 #[tokio::test]
 async fn test() {
-    let order_created_event = Sum::First(OrderEvent::Created(OrderCreatedEvent {
+    let order_created_event = Sum::Second(OrderEvent::Created(OrderCreatedEvent {
         order_id: 1,
         customer_name: "John Doe".to_string(),
         items: vec!["Item 1".to_string(), "Item 2".to_string()],
@@ -88,7 +87,7 @@ async fn test() {
 
     let saga_manager = SagaManager::new(
         SimpleActionPublisher::new(),
-        combine(order_saga(), shipment_saga()),
+        shipment_saga().combine(order_saga()),
     );
     let result = saga_manager.handle(&order_created_event).await;
     assert!(result.is_ok());

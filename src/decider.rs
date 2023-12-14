@@ -1,4 +1,4 @@
-use crate::{DecideFunction, EvolveFunction, InitialStateFunction};
+use crate::{DecideFunction, EvolveFunction, InitialStateFunction, Sum};
 
 /// [Decider] represents the main decision-making algorithm.
 /// It has three generic parameters `C`/`Command`, `S`/`State`, `E`/`Event` , representing the type of the values that Decider may contain or use.
@@ -223,6 +223,61 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
         let new_evolve = Box::new(move |s: &S, e: &E| (self.evolve)(s, e));
 
         let new_initial_state = Box::new(move || (self.initial_state)());
+
+        Decider {
+            decide: new_decide,
+            evolve: new_evolve,
+            initial_state: new_initial_state,
+        }
+    }
+
+    /// Combines two deciders into one bigger decider
+    /// Creates a new instance of a Decider by combining two deciders of type `C`, `S`, `E` and `C2`, `S2`, `E2` into a new decider of type `Sum<C, C2>`, `(S, S2)`, `Sum<E, E2>`
+    pub fn combine<C2, S2, E2>(
+        self,
+        decider2: Decider<'a, C2, S2, E2>,
+    ) -> Decider<'a, Sum<C, C2>, (S, S2), Sum<E, E2>>
+    where
+        S: Clone,
+        S2: Clone,
+    {
+        let new_decide = Box::new(move |c: &Sum<C, C2>, s: &(S, S2)| match c {
+            Sum::First(c) => {
+                let s1 = &s.0;
+                let events = (self.decide)(c, s1);
+                events
+                    .into_iter()
+                    .map(|e: E| Sum::First(e))
+                    .collect::<Vec<Sum<E, E2>>>()
+            }
+            Sum::Second(c) => {
+                let s2 = &s.1;
+                let events = (decider2.decide)(c, s2);
+                events
+                    .into_iter()
+                    .map(|e: E2| Sum::Second(e))
+                    .collect::<Vec<Sum<E, E2>>>()
+            }
+        });
+
+        let new_evolve = Box::new(move |s: &(S, S2), e: &Sum<E, E2>| match e {
+            Sum::First(e) => {
+                let s1 = &s.0;
+                let new_state = (self.evolve)(s1, e);
+                (new_state, s.1.to_owned())
+            }
+            Sum::Second(e) => {
+                let s2 = &s.1;
+                let new_state = (decider2.evolve)(s2, e);
+                (s.0.to_owned(), new_state)
+            }
+        });
+
+        let new_initial_state = Box::new(move || {
+            let s1 = (self.initial_state)();
+            let s2 = (decider2.initial_state)();
+            (s1, s2)
+        });
 
         Decider {
             decide: new_decide,

@@ -18,7 +18,7 @@ pub trait ActionPublisher<A, Error> {
 
 /// Saga Manager.
 ///
-/// It is using a [Saga] to react to the action result and to publish the new actions.
+/// It is using a `Saga` to react to the action result and to publish the new actions.
 /// It is using an [ActionPublisher] to publish the new actions.
 ///
 /// Generic parameters:

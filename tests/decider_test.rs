@@ -1,5 +1,4 @@
 use fmodel_rust::decider::{Decider, EventComputation, StateComputation};
-use fmodel_rust::decider_combined::combine;
 use fmodel_rust::{Sum::First as Order, Sum::Second as Shipment};
 
 use crate::api::{
@@ -121,7 +120,7 @@ fn test() {
     let order_decider2: Decider<OrderCommand, OrderState, OrderEvent> = crate::order_decider();
     let shpiment_decider2: Decider<ShipmentCommand, ShipmentState, ShipmentEvent> =
         shipment_decider();
-    let combined_decider = combine(order_decider2, shpiment_decider2);
+    let combined_decider = order_decider2.combine(shpiment_decider2);
 
     let create_order_command = OrderCommand::Create(CreateOrderCommand {
         order_id: 1,

@@ -1,4 +1,4 @@
-use crate::{EvolveFunction, InitialStateFunction};
+use crate::{EvolveFunction, InitialStateFunction, Sum};
 
 /// [View] represents the event handling algorithm, responsible for translating the events into denormalized state, which is more adequate for querying.
 /// It has two generic parameters `S`/State, `E`/Event , representing the type of the values that View may contain or use.
@@ -118,6 +118,38 @@ impl<'a, S, E> View<'a, S, E> {
         });
 
         let new_initial_state = Box::new(move || (self.initial_state)());
+
+        View {
+            evolve: new_evolve,
+            initial_state: new_initial_state,
+        }
+    }
+
+    /// Combines two views into one.
+    /// Creates a new instance of a View by combining two views of type `S`, `E` and `S2`, `E2` into a new view of type `(S, S2)`, `Sum<E, E2>`
+    pub fn combine<S2: Clone, E2>(self, view2: View<'a, S2, E2>) -> View<'a, (S, S2), Sum<E, E2>>
+    where
+        S: Clone,
+        S2: Clone,
+    {
+        let new_evolve = Box::new(move |s: &(S, S2), e: &Sum<E, E2>| match e {
+            Sum::First(e) => {
+                let s1 = &s.0;
+                let new_state = (self.evolve)(s1, e);
+                (new_state, s.1.to_owned())
+            }
+            Sum::Second(e) => {
+                let s2 = &s.1;
+                let new_state = (view2.evolve)(s2, e);
+                (s.0.to_owned(), new_state)
+            }
+        });
+
+        let new_initial_state = Box::new(move || {
+            let s1 = (self.initial_state)();
+            let s2 = (view2.initial_state)();
+            (s1, s2)
+        });
 
         View {
             evolve: new_evolve,

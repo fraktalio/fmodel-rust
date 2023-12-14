@@ -8,7 +8,6 @@ use derive_more::Display;
 
 use fmodel_rust::materialized_view::{MaterializedView, ViewStateRepository};
 use fmodel_rust::view::View;
-use fmodel_rust::view_combined::combine;
 use fmodel_rust::Sum;
 
 use crate::api::{
@@ -155,7 +154,7 @@ impl
 
 #[tokio::test]
 async fn test() {
-    let combined_view = combine(order_view(), shipment_view());
+    let combined_view = order_view().combine(shipment_view());
     let repository = InMemoryViewStateRepository::new();
     let materialized_view = Arc::new(MaterializedView::new(repository, combined_view));
     let materialized_view1 = Arc::clone(&materialized_view);

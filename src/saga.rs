@@ -1,4 +1,4 @@
-use crate::ReactFunction;
+use crate::{ReactFunction, Sum};
 
 /// [Saga] is a datatype that represents the central point of control, deciding what to execute next (`A`), based on the action result (`AR`).
 /// It has two generic parameters `AR`/Action Result, `A`/Action , representing the type of the values that Saga may contain or use.
@@ -110,6 +110,23 @@ impl<'a, AR, A> Saga<'a, AR, A> {
         let new_react = Box::new(move |ar2: &AR2| {
             let ar = f(ar2);
             (self.react)(&ar)
+        });
+
+        Saga { react: new_react }
+    }
+
+    /// Combines two sagas into one.
+    /// Creates a new instance of a Saga by combining two sagas of type `AR`, `A` and `AR2`, `A2` into a new saga of type `Sum<AR, AR2>`, `Sum<A2, A>`
+    pub fn combine<AR2, A2>(self, saga2: Saga<'a, AR2, A2>) -> Saga<'a, Sum<AR, AR2>, Sum<A2, A>> {
+        let new_react = Box::new(move |ar: &Sum<AR, AR2>| match ar {
+            Sum::First(ar) => {
+                let a = (self.react)(ar);
+                a.into_iter().map(|a: A| Sum::Second(a)).collect()
+            }
+            Sum::Second(ar2) => {
+                let a2 = (saga2.react)(ar2);
+                a2.into_iter().map(|a: A2| Sum::First(a)).collect()
+            }
         });
 
         Saga { react: new_react }

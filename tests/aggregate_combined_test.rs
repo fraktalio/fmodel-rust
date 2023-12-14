@@ -10,7 +10,6 @@ use fmodel_rust::aggregate::{
     EventRepository, EventSourcedAggregate, StateRepository, StateStoredAggregate,
 };
 use fmodel_rust::decider::Decider;
-use fmodel_rust::decider_combined::combine;
 use fmodel_rust::Sum;
 
 use crate::api::{
@@ -271,7 +270,7 @@ fn shipment_decider<'a>() -> Decider<'a, ShipmentCommand, ShipmentState, Shipmen
 
 #[tokio::test]
 async fn es_test() {
-    let combined_decider = combine(order_decider(), shipment_decider());
+    let combined_decider = order_decider().combine(shipment_decider());
     let repository = InMemoryEventRepository::new();
     let aggregate = Arc::new(EventSourcedAggregate::new(repository, combined_decider));
     // Makes a clone of the Arc pointer.
@@ -380,7 +379,7 @@ async fn es_test() {
 
 #[tokio::test]
 async fn ss_test() {
-    let combined_decider = combine(order_decider(), shipment_decider());
+    let combined_decider = order_decider().combine(shipment_decider());
     let repository = InMemoryStateRepository::new();
     let aggregate = Arc::new(StateStoredAggregate::new(repository, combined_decider));
     let aggregate2 = Arc::clone(&aggregate);
