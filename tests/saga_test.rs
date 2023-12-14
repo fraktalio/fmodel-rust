@@ -64,7 +64,7 @@ fn test() {
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
         })]
     );
-    let combined_commands = combined_saga.compute_new_actions(&Sum::First(order_created_event));
+    let combined_commands = combined_saga.compute_new_actions(&Sum::Second(order_created_event));
     assert_eq!(
         combined_commands,
         [Sum::First(ShipmentCommand::Create(CreateShipmentCommand {

@@ -344,14 +344,3 @@ pub enum Sum<A, B> {
     /// Second variant
     Second(B),
 }
-
-/// Define the generic Combined/Sum Enum
-#[derive(Debug, PartialEq, Clone)]
-pub enum Sum3<A, B, C> {
-    /// First variant
-    First(A),
-    /// Second variant
-    Second(B),
-    /// Third variant
-    Third(C),
-}

@@ -80,7 +80,7 @@ impl ActionPublisher<Sum<ShipmentCommand, OrderCommand>, SagaManagerError>
 
 #[tokio::test]
 async fn test() {
-    let order_created_event = Sum::First(OrderEvent::Created(OrderCreatedEvent {
+    let order_created_event = Sum::Second(OrderEvent::Created(OrderCreatedEvent {
         order_id: 1,
         customer_name: "John Doe".to_string(),
         items: vec!["Item 1".to_string(), "Item 2".to_string()],
