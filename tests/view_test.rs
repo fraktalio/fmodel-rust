@@ -1,5 +1,4 @@
 use fmodel_rust::view::{View, ViewStateComputation};
-use fmodel_rust::view_combined::combine;
 use fmodel_rust::{Sum::First as Order, Sum::Second as Shipment};
 
 use crate::api::{
@@ -81,7 +80,7 @@ fn test() {
     let order_view: View<OrderViewState, OrderEvent> = order_view();
     let order_view2: View<OrderViewState, OrderEvent> = crate::order_view();
     let shipment_view: View<ShipmentViewState, ShipmentEvent> = shipment_view();
-    let combined_view = combine(order_view2, shipment_view);
+    let combined_view = order_view2.combine(shipment_view);
 
     let order_created_event = OrderEvent::Created(OrderCreatedEvent {
         order_id: 1,

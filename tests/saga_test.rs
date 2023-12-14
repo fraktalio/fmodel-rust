@@ -1,5 +1,4 @@
 use fmodel_rust::saga::{ActionComputation, Saga};
-use fmodel_rust::saga_combined::combine;
 use fmodel_rust::Sum;
 
 use crate::api::{
@@ -48,7 +47,7 @@ fn test() {
     let order_saga: Saga<OrderEvent, ShipmentCommand> = order_saga();
     let order_saga2: Saga<OrderEvent, ShipmentCommand> = crate::order_saga();
     let shipment_saga: Saga<ShipmentEvent, OrderCommand> = shipment_saga();
-    let combined_saga = combine(order_saga2, shipment_saga);
+    let combined_saga = order_saga2.combine(shipment_saga);
     let order_created_event = OrderEvent::Created(OrderCreatedEvent {
         order_id: 1,
         customer_name: "John Doe".to_string(),
@@ -64,14 +63,16 @@ fn test() {
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
         })]
     );
-    let combined_commands = combined_saga.compute_new_actions(&Sum::Second(order_created_event));
+    let combined_commands = combined_saga.compute_new_actions(&Sum::First(order_created_event));
     assert_eq!(
         combined_commands,
-        [Sum::First(ShipmentCommand::Create(CreateShipmentCommand {
-            shipment_id: 1,
-            order_id: 1,
-            customer_name: "John Doe".to_string(),
-            items: vec!["Item 1".to_string(), "Item 2".to_string()],
-        }))]
+        [Sum::Second(ShipmentCommand::Create(
+            CreateShipmentCommand {
+                shipment_id: 1,
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 1".to_string(), "Item 2".to_string()],
+            }
+        ))]
     );
 }
