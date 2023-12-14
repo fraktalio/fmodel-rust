@@ -48,11 +48,54 @@ where
     _marker: PhantomData<(C, S, E, Version, Error)>,
 }
 
-impl<C, S, E, Repository, Decider, Version, Error>
-    EventSourcedAggregate<C, S, E, Repository, Decider, Version, Error>
+impl<C, S, E, Repository, Decider, Version, Error> EventComputation<C, S, E>
+    for EventSourcedAggregate<C, S, E, Repository, Decider, Version, Error>
 where
     Repository: EventRepository<C, E, Version, Error>,
     Decider: EventComputation<C, S, E>,
+{
+    /// Computes new events based on the current events and the command.
+    fn compute_new_events(&self, current_events: &[E], command: &C) -> Vec<E> {
+        self.decider.compute_new_events(current_events, command)
+    }
+}
+
+#[async_trait]
+impl<C, S, E, Repository, Decider, Version, Error> EventRepository<C, E, Version, Error>
+    for EventSourcedAggregate<C, S, E, Repository, Decider, Version, Error>
+where
+    Repository: EventRepository<C, E, Version, Error> + Sync,
+    Decider: EventComputation<C, S, E> + Sync,
+    C: Sync,
+    S: Sync,
+    E: Sync,
+    Version: Sync,
+    Error: Sync,
+{
+    /// Fetches current events, based on the command.
+    async fn fetch_events(&self, command: &C) -> Result<Vec<(E, Version)>, Error> {
+        self.repository.fetch_events(command).await
+    }
+    /// Saves events.
+    async fn save(
+        &self,
+        events: &[E],
+        latest_version: &Option<Version>,
+    ) -> Result<Vec<(E, Version)>, Error> {
+        self.repository.save(events, latest_version).await
+    }
+}
+
+impl<C, S, E, Repository, Decider, Version, Error>
+    EventSourcedAggregate<C, S, E, Repository, Decider, Version, Error>
+where
+    Repository: EventRepository<C, E, Version, Error> + Sync,
+    Decider: EventComputation<C, S, E> + Sync,
+    C: Sync,
+    S: Sync,
+    E: Sync,
+    Version: Sync,
+    Error: Sync,
 {
     /// Creates a new instance of [EventSourcedAggregate].
     pub fn new(repository: Repository, decider: Decider) -> Self {
@@ -64,15 +107,15 @@ where
     }
     /// Handles the command by fetching the events from the repository, computing new events based on the current events and the command, and saving the new events to the repository.
     pub async fn handle(&self, command: &C) -> Result<Vec<(E, Version)>, Error> {
-        let events: Vec<(E, Version)> = self.repository.fetch_events(command).await?;
+        let events: Vec<(E, Version)> = self.fetch_events(command).await?;
         let mut version: Option<Version> = None;
         let mut current_events: Vec<E> = vec![];
         for (event, ver) in events {
             version = Some(ver);
             current_events.push(event);
         }
-        let new_events = self.decider.compute_new_events(&current_events, command);
-        let saved_events = self.repository.save(&new_events, &version).await?;
+        let new_events = self.compute_new_events(&current_events, command);
+        let saved_events = self.save(&new_events, &version).await?;
         Ok(saved_events)
     }
 }
@@ -117,11 +160,50 @@ where
     _marker: PhantomData<(C, S, E, Version, Error)>,
 }
 
-impl<C, S, E, Repository, Decider, Version, Error>
-    StateStoredAggregate<C, S, E, Repository, Decider, Version, Error>
+impl<C, S, E, Repository, Decider, Version, Error> StateComputation<C, S, E>
+    for StateStoredAggregate<C, S, E, Repository, Decider, Version, Error>
 where
     Repository: StateRepository<C, S, Version, Error>,
     Decider: StateComputation<C, S, E>,
+{
+    /// Computes new state based on the current state and the command.
+    fn compute_new_state(&self, current_state: Option<S>, command: &C) -> S {
+        self.decider.compute_new_state(current_state, command)
+    }
+}
+
+#[async_trait]
+impl<C, S, E, Repository, Decider, Version, Error> StateRepository<C, S, Version, Error>
+    for StateStoredAggregate<C, S, E, Repository, Decider, Version, Error>
+where
+    Repository: StateRepository<C, S, Version, Error> + Sync,
+    Decider: StateComputation<C, S, E> + Sync,
+    C: Sync,
+    S: Sync,
+    E: Sync,
+    Version: Sync,
+    Error: Sync,
+{
+    /// Fetches current state, based on the command.
+    async fn fetch_state(&self, command: &C) -> Result<Option<(S, Version)>, Error> {
+        self.repository.fetch_state(command).await
+    }
+    /// Saves state.
+    async fn save(&self, state: &S, version: &Option<Version>) -> Result<(S, Version), Error> {
+        self.repository.save(state, version).await
+    }
+}
+
+impl<C, S, E, Repository, Decider, Version, Error>
+    StateStoredAggregate<C, S, E, Repository, Decider, Version, Error>
+where
+    Repository: StateRepository<C, S, Version, Error> + Sync,
+    Decider: StateComputation<C, S, E> + Sync,
+    C: Sync,
+    S: Sync,
+    E: Sync,
+    Version: Sync,
+    Error: Sync,
 {
     /// Creates a new instance of [StateStoredAggregate].
     pub fn new(repository: Repository, decider: Decider) -> Self {
@@ -133,16 +215,16 @@ where
     }
     /// Handles the command by fetching the state from the repository, computing new state based on the current state and the command, and saving the new state to the repository.
     pub async fn handle(&self, command: &C) -> Result<(S, Version), Error> {
-        let state_version = self.repository.fetch_state(command).await?;
+        let state_version = self.fetch_state(command).await?;
         match state_version {
             None => {
-                let new_state = self.decider.compute_new_state(None, command);
-                let saved_state = self.repository.save(&new_state, &None).await?;
+                let new_state = self.compute_new_state(None, command);
+                let saved_state = self.save(&new_state, &None).await?;
                 Ok(saved_state)
             }
             Some((state, version)) => {
-                let new_state = self.decider.compute_new_state(Some(state), command);
-                let saved_state = self.repository.save(&new_state, &Some(version)).await?;
+                let new_state = self.compute_new_state(Some(state), command);
+                let saved_state = self.save(&new_state, &Some(version)).await?;
                 Ok(saved_state)
             }
         }
