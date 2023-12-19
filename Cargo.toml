@@ -12,5 +12,5 @@ serde = {version = "1.0.193", features = ["derive"]}
 
 [dev-dependencies]
 derive_more = "0.99.17"
-tokio = { version = "1.35.0", features = ["rt", "rt-multi-thread", "macros"] }
+tokio = { version = "1.35.1", features = ["rt", "rt-multi-thread", "macros"] }
 
