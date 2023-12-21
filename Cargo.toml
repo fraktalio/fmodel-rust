@@ -6,7 +6,7 @@ description = "Accelerate development of compositional, safe, and ergonomic appl
 license = "Apache-2.0"
 
 [dependencies]
-async-trait = "0.1.74"
+async-trait = "0.1.75"
 serde = {version = "1.0.193", features = ["derive"]}
 
 
