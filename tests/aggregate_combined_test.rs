@@ -8,14 +8,16 @@ use derive_more::Display;
 
 use fmodel_rust::aggregate::{
     EventRepository, EventSourcedAggregate, StateRepository, StateStoredAggregate,
+    StateStoredOrchestratingAggregate,
 };
 use fmodel_rust::decider::Decider;
+use fmodel_rust::saga::Saga;
 use fmodel_rust::Sum;
 
 use crate::api::{
-    CancelOrderCommand, CreateOrderCommand, OrderCancelledEvent, OrderCommand, OrderCreatedEvent,
-    OrderEvent, OrderUpdatedEvent, ShipmentCommand, ShipmentCreatedEvent, ShipmentEvent,
-    UpdateOrderCommand,
+    CancelOrderCommand, CreateOrderCommand, CreateShipmentCommand, OrderCancelledEvent,
+    OrderCommand, OrderCreatedEvent, OrderEvent, OrderUpdatedEvent, ShipmentCommand,
+    ShipmentCreatedEvent, ShipmentEvent, UpdateOrderCommand,
 };
 
 mod api;
@@ -264,6 +266,40 @@ fn shipment_decider<'a>() -> Decider<'a, ShipmentCommand, ShipmentState, Shipmen
             order_id: 0,
             customer_name: "".to_string(),
             items: Vec::new(),
+        }),
+    }
+}
+
+fn order_saga<'a>() -> Saga<'a, OrderEvent, ShipmentCommand> {
+    Saga {
+        react: Box::new(|event| match event {
+            OrderEvent::Created(created_event) => {
+                vec![ShipmentCommand::Create(CreateShipmentCommand {
+                    shipment_id: created_event.order_id,
+                    order_id: created_event.order_id,
+                    customer_name: created_event.customer_name.to_owned(),
+                    items: created_event.items.to_owned(),
+                })]
+            }
+            OrderEvent::Updated(_updated_event) => {
+                vec![]
+            }
+            OrderEvent::Cancelled(_cancelled_event) => {
+                vec![]
+            }
+        }),
+    }
+}
+
+fn shipment_saga<'a>() -> Saga<'a, ShipmentEvent, OrderCommand> {
+    Saga {
+        react: Box::new(|event| match event {
+            ShipmentEvent::Created(created_event) => {
+                vec![OrderCommand::Update(api::UpdateOrderCommand {
+                    order_id: created_event.order_id,
+                    new_items: created_event.items.to_owned(),
+                })]
+            }
         }),
     }
 }
@@ -535,6 +571,181 @@ async fn ss_test() {
                         order_id: 0,
                         customer_name: "".to_string(),
                         items: Vec::new(),
+                    }
+                ),
+                2
+            )
+        );
+    });
+
+    handle1.join().unwrap().await;
+    handle2.join().unwrap().await;
+}
+
+#[tokio::test]
+async fn ss_combined_test() {
+    let combined_decider = order_decider().combine(shipment_decider());
+    let combined_saga = order_saga().combine(shipment_saga());
+
+    let repository = InMemoryStateRepository::new();
+    let aggregate = Arc::new(StateStoredOrchestratingAggregate::new(
+        repository,
+        combined_decider,
+        combined_saga,
+    ));
+    let aggregate2 = Arc::clone(&aggregate);
+
+    let handle1 = thread::spawn(|| async move {
+        let command = Sum::First(OrderCommand::Create(CreateOrderCommand {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        }));
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                (
+                    OrderState {
+                        order_id: 1,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                        is_cancelled: false,
+                    },
+                    ShipmentState {
+                        shipment_id: 1,
+                        order_id: 1,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }
+                ),
+                0
+            )
+        );
+        let command = Sum::First(OrderCommand::Update(UpdateOrderCommand {
+            order_id: 1,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        }));
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                (
+                    OrderState {
+                        order_id: 1,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                        is_cancelled: false,
+                    },
+                    ShipmentState {
+                        shipment_id: 1,
+                        order_id: 1,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }
+                ),
+                1
+            )
+        );
+        let command = Sum::First(OrderCommand::Cancel(CancelOrderCommand { order_id: 1 }));
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                (
+                    OrderState {
+                        order_id: 1,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                        is_cancelled: true,
+                    },
+                    ShipmentState {
+                        shipment_id: 1,
+                        order_id: 1,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }
+                ),
+                2
+            )
+        );
+    });
+
+    let handle2 = thread::spawn(|| async move {
+        let command = Sum::First(OrderCommand::Create(CreateOrderCommand {
+            order_id: 2,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        }));
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                (
+                    OrderState {
+                        order_id: 2,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                        is_cancelled: false,
+                    },
+                    ShipmentState {
+                        shipment_id: 2,
+                        order_id: 2,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }
+                ),
+                0
+            )
+        );
+        let command = Sum::First(OrderCommand::Update(UpdateOrderCommand {
+            order_id: 2,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        }));
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                (
+                    OrderState {
+                        order_id: 2,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                        is_cancelled: false,
+                    },
+                    ShipmentState {
+                        shipment_id: 2,
+                        order_id: 2,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }
+                ),
+                1
+            )
+        );
+        let command = Sum::First(OrderCommand::Cancel(CancelOrderCommand { order_id: 2 }));
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            (
+                (
+                    OrderState {
+                        order_id: 2,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                        is_cancelled: true,
+                    },
+                    ShipmentState {
+                        shipment_id: 2,
+                        order_id: 2,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
                     }
                 ),
                 2
