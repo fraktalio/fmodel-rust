@@ -3,7 +3,6 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use async_trait::async_trait;
 use derive_more::Display;
 
 use fmodel_rust::aggregate::{
@@ -75,7 +74,6 @@ impl Id for (OrderState, ShipmentState) {
     }
 }
 /// Implementation of [EventRepository] for [InMemoryEventRepository] - infrastructure
-#[async_trait]
 impl
     EventRepository<
         Sum<OrderCommand, ShipmentCommand>,
@@ -133,7 +131,6 @@ impl InMemoryStateRepository {
 }
 
 // Implementation of [StateRepository] for [InMemoryOrderStateRepository]
-#[async_trait]
 impl
     StateRepository<
         Sum<OrderCommand, ShipmentCommand>,

@@ -3,7 +3,6 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use async_trait::async_trait;
 use derive_more::Display;
 
 use fmodel_rust::materialized_view::{MaterializedView, ViewStateRepository};
@@ -72,7 +71,6 @@ impl InMemoryViewOrderStateRepository {
 }
 
 // Implementation of [ViewStateRepository] for [InMemoryViewOrderStateRepository]
-#[async_trait]
 impl ViewStateRepository<OrderEvent, OrderViewState, MaterializedViewError>
     for InMemoryViewOrderStateRepository
 {

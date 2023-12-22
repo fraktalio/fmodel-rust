@@ -1,6 +1,5 @@
+use std::future::Future;
 use std::marker::PhantomData;
-
-use async_trait::async_trait;
 
 use crate::saga::ActionComputation;
 
@@ -10,10 +9,11 @@ use crate::saga::ActionComputation;
 ///
 /// - `A`. - action
 /// - `Error` - error
-#[async_trait]
 pub trait ActionPublisher<A, Error> {
     /// Publishes the action/command to some external system, returning either the actions that are successfully published or error.
-    async fn publish(&self, action: &[A]) -> Result<Vec<A>, Error>;
+    /// Desugared `async fn publish(&self, action: &[A]) -> Result<Vec<A>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn publish(&self, action: &[A]) -> impl Future<Output = Result<Vec<A>, Error>> + Send;
 }
 
 /// Saga Manager.
@@ -48,7 +48,6 @@ where
     }
 }
 
-#[async_trait]
 impl<A, AR, Publisher, Saga, Error> ActionPublisher<A, Error>
     for SagaManager<A, AR, Publisher, Saga, Error>
 where

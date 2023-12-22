@@ -1,6 +1,5 @@
+use std::future::Future;
 use std::marker::PhantomData;
-
-use async_trait::async_trait;
 
 use crate::view::ViewStateComputation;
 
@@ -11,12 +10,15 @@ use crate::view::ViewStateComputation;
 /// - `E` - Event
 /// - `S` - State
 /// - `Error` - Error
-#[async_trait]
 pub trait ViewStateRepository<E, S, Error> {
     /// Fetches current state, based on the event.
-    async fn fetch_state(&self, event: &E) -> Result<Option<S>, Error>;
+    /// Desugared `async fn fetch_state(&self, event: &E) -> Result<Option<S>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn fetch_state(&self, event: &E) -> impl Future<Output = Result<Option<S>, Error>> + Send;
     /// Saves the new state.
-    async fn save(&self, state: &S) -> Result<S, Error>;
+    /// Desugared `async fn save(&self, state: &S) -> Result<S, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn save(&self, state: &S) -> impl Future<Output = Result<S, Error>> + Send;
 }
 
 /// Materialized View.
@@ -53,7 +55,6 @@ where
     }
 }
 
-#[async_trait]
 impl<S, E, Repository, View, Error> ViewStateRepository<E, S, Error>
     for MaterializedView<S, E, Repository, View, Error>
 where

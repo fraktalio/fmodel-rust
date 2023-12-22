@@ -3,7 +3,6 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use async_trait::async_trait;
 use derive_more::Display;
 
 use fmodel_rust::aggregate::{
@@ -44,7 +43,6 @@ impl InMemoryOrderEventRepository {
 }
 
 /// Implementation of [EventRepository] for [InMemoryOrderEventRepository] - infrastructure
-#[async_trait]
 impl EventRepository<OrderCommand, OrderEvent, i32, AggregateError>
     for InMemoryOrderEventRepository
 {
@@ -97,7 +95,6 @@ impl InMemoryOrderStateRepository {
 }
 
 // Implementation of [StateRepository] for [InMemoryOrderStateRepository]
-#[async_trait]
 impl StateRepository<OrderCommand, OrderState, i32, AggregateError>
     for InMemoryOrderStateRepository
 {
