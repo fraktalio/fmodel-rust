@@ -1,6 +1,10 @@
 # **f`(`model`)`** - Functional Domain Modeling with Rust
 
->Publicly available at [crates.io](https://crates.io/crates/fmodel-rust) and [docs.rs](https://docs.rs/fmodel-rust/latest/fmodel_rust/)
+> Publicly available at [crates.io](https://crates.io/crates/fmodel-rust) and [docs.rs](https://docs.rs/fmodel-rust/latest/fmodel_rust/)
+
+> From version 0.7.0+, the library is using [`async fn` in Traits](https://blog.rust-lang.org/2023/12/21/async-fn-rpit-in-traits.html) feature, which is currently available only in stable Rust 1.75.0+.
+
+> If you are using older version of Rust, please use version 0.6.0 of the library. It depends on `async-trait` crate. Version 0.6.0 is not maintained anymore, only patched for security issues and bugs.
 
 When you’re developing an information system to automate the activities of the business, you are modeling the business.
 The abstractions that you design, the behaviors that you implement, and the UI interactions that you build all reflect
@@ -539,7 +543,7 @@ cargo add fmodel-rust
 Or add the following line to your `Cargo.toml` file:
 
 ```toml
-fmodel-rust = "0.6.0"
+fmodel-rust = "0.7.0"
 ```
 
 ## Examples
