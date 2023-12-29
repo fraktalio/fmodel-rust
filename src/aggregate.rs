@@ -1,6 +1,5 @@
+use std::future::Future;
 use std::marker::PhantomData;
-
-use async_trait::async_trait;
 
 use crate::decider::{Decider, EventComputation, StateComputation};
 use crate::saga::{ActionComputation, Saga};
@@ -13,16 +12,22 @@ use crate::saga::{ActionComputation, Saga};
 /// - `E` - Event
 /// - `Version` - Version/Offset/Sequence number
 /// - `Error` - Error
-#[async_trait]
 pub trait EventRepository<C, E, Version, Error> {
     /// Fetches current events, based on the command.
-    async fn fetch_events(&self, command: &C) -> Result<Vec<(E, Version)>, Error>;
+    /// Desugared `async fn fetch_events(&self, command: &C) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn fetch_events(
+        &self,
+        command: &C,
+    ) -> impl Future<Output = Result<Vec<(E, Version)>, Error>> + Send;
     /// Saves events.
-    async fn save(
+    /// Desugared `async fn save(&self, events: &[E], latest_version: &Option<Version>) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn save(
         &self,
         events: &[E],
         latest_version: &Option<Version>,
-    ) -> Result<Vec<(E, Version)>, Error>;
+    ) -> impl Future<Output = Result<Vec<(E, Version)>, Error>> + Send;
 }
 
 /// Event Sourced Aggregate.
@@ -61,7 +66,6 @@ where
     }
 }
 
-#[async_trait]
 impl<C, S, E, Repository, Decider, Version, Error> EventRepository<C, E, Version, Error>
     for EventSourcedAggregate<C, S, E, Repository, Decider, Version, Error>
 where
@@ -129,12 +133,22 @@ where
 /// - `S` - State
 /// - `Version` - Version
 /// - `Error` - Error
-#[async_trait]
 pub trait StateRepository<C, S, Version, Error> {
     /// Fetches current state, based on the command.
-    async fn fetch_state(&self, command: &C) -> Result<Option<(S, Version)>, Error>;
+    /// Desugared `async fn fetch_state(&self, command: &C) -> Result<Option<(S, Version)>, Error>;` to a normal `fn` that returns `impl Future` and adds bound `Send`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn fetch_state(
+        &self,
+        command: &C,
+    ) -> impl Future<Output = Result<Option<(S, Version)>, Error>> + Send;
     /// Saves state.
-    async fn save(&self, state: &S, version: &Option<Version>) -> Result<(S, Version), Error>;
+    /// Desugared `async fn save(&self, state: &S, version: &Option<Version>) -> Result<(S, Version), Error>;` to a normal `fn` that returns `impl Future` and adds bound `Send`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn save(
+        &self,
+        state: &S,
+        version: &Option<Version>,
+    ) -> impl Future<Output = Result<(S, Version), Error>> + Send;
 }
 
 /// State Stored Aggregate.
@@ -173,7 +187,6 @@ where
     }
 }
 
-#[async_trait]
 impl<C, S, E, Repository, Decider, Version, Error> StateRepository<C, S, Version, Error>
     for StateStoredAggregate<C, S, E, Repository, Decider, Version, Error>
 where
@@ -281,7 +294,6 @@ where
     }
 }
 
-#[async_trait]
 impl<'a, C, S, E, Repository, Version, Error> StateRepository<C, S, Version, Error>
     for StateStoredOrchestratingAggregate<'a, C, S, E, Repository, Version, Error>
 where

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use derive_more::Display;
 use fmodel_rust::saga::Saga;
 use fmodel_rust::saga_manager::{ActionPublisher, SagaManager};
@@ -65,7 +64,6 @@ impl SimpleActionPublisher {
     }
 }
 
-#[async_trait]
 impl ActionPublisher<Sum<ShipmentCommand, OrderCommand>, SagaManagerError>
     for SimpleActionPublisher
 {
