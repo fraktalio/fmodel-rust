@@ -14,6 +14,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/setup-rust@v1
+        with:
+          profile: default
+          toolchain: '1.75.0'
+
       - name: Publish
         run: cargo publish --token ${CRATES_TOKEN}
         env:
