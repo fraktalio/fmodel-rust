@@ -285,6 +285,7 @@
 //!
 //! ## Examples
 //!
+//! - [Restaurant Demo - with Postgres](https://github.com/fraktalio/fmodel-rust-demo)
 //! - [Gift Card Demo - with Axon](https://!github.com/AxonIQ/axon-rust/tree/main/gift-card-rust)
 //! - [FModel Rust Tests](https://!github.com/fraktalio/fmodel-rust/tree/main/tests)
 //!
