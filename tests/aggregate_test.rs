@@ -1,9 +1,6 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
-
-use derive_more::Display;
 
 use fmodel_rust::aggregate::{
     EventRepository, EventSourcedAggregate, StateRepository, StateStoredAggregate,
@@ -12,22 +9,12 @@ use fmodel_rust::decider::Decider;
 
 use crate::api::{
     CancelOrderCommand, CreateOrderCommand, OrderCancelledEvent, OrderCommand, OrderCreatedEvent,
-    OrderEvent, OrderUpdatedEvent, UpdateOrderCommand,
+    OrderEvent, OrderState, OrderUpdatedEvent, UpdateOrderCommand,
 };
+use crate::application::AggregateError;
 
 mod api;
-
-/// Error type for the application/aggregate
-#[derive(Debug, Display)]
-#[allow(dead_code)]
-enum AggregateError {
-    FetchEvents(String),
-    SaveEvents(String),
-    FetchState(String),
-    SaveState(String),
-}
-
-impl Error for AggregateError {}
+mod application;
 
 /// A simple in-memory event repository - infrastructure
 struct InMemoryOrderEventRepository {
@@ -119,39 +106,31 @@ impl StateRepository<OrderCommand, OrderState, i32, AggregateError>
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-struct OrderState {
-    order_id: u32,
-    customer_name: String,
-    items: Vec<String>,
-    is_cancelled: bool,
-}
-
 /// Decider for the Order aggregate - Domain logic
 fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
     Decider {
         decide: Box::new(|command, state| match command {
-            OrderCommand::Create(create_cmd) => {
+            OrderCommand::Create(cmd) => {
                 vec![OrderEvent::Created(OrderCreatedEvent {
-                    order_id: create_cmd.order_id,
-                    customer_name: create_cmd.customer_name.to_owned(),
-                    items: create_cmd.items.to_owned(),
+                    order_id: cmd.order_id,
+                    customer_name: cmd.customer_name.to_owned(),
+                    items: cmd.items.to_owned(),
                 })]
             }
-            OrderCommand::Update(update_cmd) => {
-                if state.order_id == update_cmd.order_id {
+            OrderCommand::Update(cmd) => {
+                if state.order_id == cmd.order_id {
                     vec![OrderEvent::Updated(OrderUpdatedEvent {
-                        order_id: update_cmd.order_id,
-                        updated_items: update_cmd.new_items.to_owned(),
+                        order_id: cmd.order_id,
+                        updated_items: cmd.new_items.to_owned(),
                     })]
                 } else {
                     vec![]
                 }
             }
-            OrderCommand::Cancel(cancel_cmd) => {
-                if state.order_id == cancel_cmd.order_id {
+            OrderCommand::Cancel(cmd) => {
+                if state.order_id == cmd.order_id {
                     vec![OrderEvent::Cancelled(OrderCancelledEvent {
-                        order_id: cancel_cmd.order_id,
+                        order_id: cmd.order_id,
                     })]
                 } else {
                     vec![]
@@ -161,13 +140,13 @@ fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
         evolve: Box::new(|state, event| {
             let mut new_state = state.clone();
             match event {
-                OrderEvent::Created(created_event) => {
-                    new_state.order_id = created_event.order_id;
-                    new_state.customer_name = created_event.customer_name.to_owned();
-                    new_state.items = created_event.items.to_owned();
+                OrderEvent::Created(evt) => {
+                    new_state.order_id = evt.order_id;
+                    new_state.customer_name = evt.customer_name.to_owned();
+                    new_state.items = evt.items.to_owned();
                 }
-                OrderEvent::Updated(updated_event) => {
-                    new_state.items = updated_event.updated_items.to_owned();
+                OrderEvent::Updated(evt) => {
+                    new_state.items = evt.updated_items.to_owned();
                 }
                 OrderEvent::Cancelled(_) => {
                     new_state.is_cancelled = true;
@@ -192,7 +171,7 @@ async fn es_test() {
     // This creates another pointer to the same allocation, increasing the strong reference count.
     let aggregate2 = Arc::clone(&aggregate);
 
-    // Lets spawn two threads to simulate two concurrent requests
+    // Let's spawn two threads to simulate two concurrent requests
     let handle1 = thread::spawn(|| async move {
         let command = OrderCommand::Create(CreateOrderCommand {
             order_id: 1,
