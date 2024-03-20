@@ -1,37 +1,30 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
-
-use derive_more::Display;
 
 use fmodel_rust::materialized_view::{MaterializedView, ViewStateRepository};
 use fmodel_rust::view::View;
 
-use crate::api::{OrderCancelledEvent, OrderCreatedEvent, OrderEvent, OrderUpdatedEvent};
+use crate::api::{
+    OrderCancelledEvent, OrderCreatedEvent, OrderEvent, OrderUpdatedEvent, OrderViewState,
+};
+use crate::application::MaterializedViewError;
 
 mod api;
-
-#[derive(Debug, Clone, PartialEq)]
-struct OrderViewState {
-    order_id: u32,
-    customer_name: String,
-    items: Vec<String>,
-    is_cancelled: bool,
-}
+mod application;
 
 fn view<'a>() -> View<'a, OrderViewState, OrderEvent> {
     View {
         evolve: Box::new(|state, event| {
             let mut new_state = state.clone();
             match event {
-                OrderEvent::Created(created_event) => {
-                    new_state.order_id = created_event.order_id;
-                    new_state.customer_name = created_event.customer_name.to_owned();
-                    new_state.items = created_event.items.to_owned();
+                OrderEvent::Created(evt) => {
+                    new_state.order_id = evt.order_id;
+                    new_state.customer_name = evt.customer_name.to_owned();
+                    new_state.items = evt.items.to_owned();
                 }
-                OrderEvent::Updated(updated_event) => {
-                    new_state.items = updated_event.updated_items.to_owned();
+                OrderEvent::Updated(evt) => {
+                    new_state.items = evt.updated_items.to_owned();
                 }
                 OrderEvent::Cancelled(_) => {
                     new_state.is_cancelled = true;
@@ -47,16 +40,6 @@ fn view<'a>() -> View<'a, OrderViewState, OrderEvent> {
         }),
     }
 }
-
-/// Error type for the application/materialized view
-#[derive(Debug, Display)]
-#[allow(dead_code)]
-enum MaterializedViewError {
-    FetchState(String),
-    SaveState(String),
-}
-
-impl Error for MaterializedViewError {}
 
 struct InMemoryViewOrderStateRepository {
     states: Mutex<HashMap<u32, OrderViewState>>,
@@ -97,7 +80,7 @@ async fn test() {
     let materialized_view1 = Arc::clone(&materialized_view);
     let materialized_view2 = Arc::clone(&materialized_view);
 
-    // Lets spawn two threads to simulate two concurrent requests
+    // Let's spawn two threads to simulate two concurrent requests
     let handle1 = thread::spawn(|| async move {
         let event = OrderEvent::Created(OrderCreatedEvent {
             order_id: 1,

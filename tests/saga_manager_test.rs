@@ -1,41 +1,32 @@
-use derive_more::Display;
 use fmodel_rust::saga::Saga;
 use fmodel_rust::saga_manager::{ActionPublisher, SagaManager};
-use std::error::Error;
 
 use crate::api::{CreateShipmentCommand, OrderCreatedEvent, OrderEvent, ShipmentCommand};
+use crate::application::SagaManagerError;
 
 mod api;
+mod application;
 
 fn saga<'a>() -> Saga<'a, OrderEvent, ShipmentCommand> {
     Saga {
         react: Box::new(|event| match event {
-            OrderEvent::Created(created_event) => {
+            OrderEvent::Created(evt) => {
                 vec![ShipmentCommand::Create(CreateShipmentCommand {
-                    shipment_id: created_event.order_id,
-                    order_id: created_event.order_id,
-                    customer_name: created_event.customer_name.to_owned(),
-                    items: created_event.items.to_owned(),
+                    shipment_id: evt.order_id,
+                    order_id: evt.order_id,
+                    customer_name: evt.customer_name.to_owned(),
+                    items: evt.items.to_owned(),
                 })]
             }
-            OrderEvent::Updated(_updated_event) => {
+            OrderEvent::Updated(_) => {
                 vec![]
             }
-            OrderEvent::Cancelled(_cancelled_event) => {
+            OrderEvent::Cancelled(_) => {
                 vec![]
             }
         }),
     }
 }
-
-/// Error type for the saga manager
-#[derive(Debug, Display)]
-#[allow(dead_code)]
-enum SagaManagerError {
-    PublishAction(String),
-}
-
-impl Error for SagaManagerError {}
 
 /// Simple action publisher that just returns the action/command.
 /// It is used for testing. In real life, it would publish the action/command to some external system. or to an aggregate that is able to handel the action/command.
