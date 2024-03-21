@@ -6,6 +6,31 @@
 
 > If you are using older version of Rust, please use version 0.6.0 of the library. It depends on `async-trait` crate. Version 0.6.0 is not maintained anymore, only patched for security issues and bugs.
 
+<!-- TOC -->
+* [**f`(`model`)`** - Functional Domain Modeling with Rust](#fmodel---functional-domain-modeling-with-rust)
+  * [`IOR<Library, Inspiration>`](#iorlibrary-inspiration)
+  * [Abstraction and generalization](#abstraction-and-generalization)
+  * [`Box<dyn Fn(&C, &S) -> Vec<E>>`](#boxdyn-fnc-s---vece)
+  * [`Box<dyn Fn(&S, &E) -> S>`](#boxdyn-fns-e---s)
+  * [Decider](#decider)
+    * [Event-sourcing aggregate](#event-sourcing-aggregate)
+    * [State-stored aggregate](#state-stored-aggregate)
+  * [View](#view)
+    * [Materialized View](#materialized-view)
+  * [Algebraic Data Types](#algebraic-data-types)
+    * [`C` / Command / Intent to change the state of the system](#c--command--intent-to-change-the-state-of-the-system)
+    * [`E` / Event / Fact](#e--event--fact)
+    * [`S` / State / Current state of the system/aggregate/entity](#s--state--current-state-of-the-systemaggregateentity)
+  * [Modeling the Behaviour of our domain](#modeling-the-behaviour-of-our-domain)
+  * [The Application layer](#the-application-layer)
+  * [Fearless Concurrency](#fearless-concurrency)
+  * [Install the crate as a dependency of your project](#install-the-crate-as-a-dependency-of-your-project)
+  * [Examples](#examples)
+  * [FModel in other languages](#fmodel-in-other-languages)
+  * [Further reading](#further-reading)
+  * [Credits](#credits)
+<!-- TOC -->
+
 When you’re developing an information system to automate the activities of the business, you are modeling the business.
 The abstractions that you design, the behaviors that you implement, and the UI interactions that you build all reflect
 the business — together, they constitute the model of the domain.
