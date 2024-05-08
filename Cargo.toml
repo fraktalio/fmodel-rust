@@ -6,7 +6,7 @@ description = "Accelerate development of compositional, safe, and ergonomic appl
 license = "Apache-2.0"
 
 [dependencies]
-serde = {version = "1.0.199", features = ["derive"]}
+serde = {version = "1.0.200", features = ["derive"]}
 
 
 [dev-dependencies]
