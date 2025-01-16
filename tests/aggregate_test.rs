@@ -54,7 +54,7 @@ impl EventRepository<OrderCommand, OrderEvent, i32, AggregateError>
     ) -> Result<Vec<(OrderEvent, i32)>, AggregateError> {
         let mut latest_version = latest_version.to_owned().unwrap_or(-1);
         let events = events
-            .into_iter()
+            .iter()
             .map(|event| {
                 latest_version += 1;
                 (event.clone(), latest_version)
@@ -64,8 +64,8 @@ impl EventRepository<OrderCommand, OrderEvent, i32, AggregateError>
         self.events
             .lock()
             .unwrap()
-            .extend_from_slice(&*events.clone());
-        Ok(Vec::from(events))
+            .extend_from_slice(&events.clone());
+        Ok(events)
     }
 }
 
@@ -110,30 +110,28 @@ impl StateRepository<OrderCommand, OrderState, i32, AggregateError>
 fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
     Decider {
         decide: Box::new(|command, state| match command {
-            OrderCommand::Create(cmd) => {
-                vec![OrderEvent::Created(OrderCreatedEvent {
-                    order_id: cmd.order_id,
-                    customer_name: cmd.customer_name.to_owned(),
-                    items: cmd.items.to_owned(),
-                })]
-            }
+            OrderCommand::Create(cmd) => Ok(vec![OrderEvent::Created(OrderCreatedEvent {
+                order_id: cmd.order_id,
+                customer_name: cmd.customer_name.to_owned(),
+                items: cmd.items.to_owned(),
+            })]),
             OrderCommand::Update(cmd) => {
                 if state.order_id == cmd.order_id {
-                    vec![OrderEvent::Updated(OrderUpdatedEvent {
+                    Ok(vec![OrderEvent::Updated(OrderUpdatedEvent {
                         order_id: cmd.order_id,
                         updated_items: cmd.new_items.to_owned(),
-                    })]
+                    })])
                 } else {
-                    vec![]
+                    Ok(vec![])
                 }
             }
             OrderCommand::Cancel(cmd) => {
                 if state.order_id == cmd.order_id {
-                    vec![OrderEvent::Cancelled(OrderCancelledEvent {
+                    Ok(vec![OrderEvent::Cancelled(OrderCancelledEvent {
                         order_id: cmd.order_id,
-                    })]
+                    })])
                 } else {
-                    vec![]
+                    Ok(vec![])
                 }
             }
         }),
@@ -166,7 +164,10 @@ fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
 #[tokio::test]
 async fn es_test() {
     let repository = InMemoryOrderEventRepository::new();
-    let aggregate = Arc::new(EventSourcedAggregate::new(repository, decider()));
+    let aggregate = Arc::new(EventSourcedAggregate::new(
+        repository,
+        decider().map_error(&|()| AggregateError::DomainError("Decider error".to_string())),
+    ));
     // Makes a clone of the Arc pointer.
     // This creates another pointer to the same allocation, increasing the strong reference count.
     let aggregate2 = Arc::clone(&aggregate);
@@ -274,7 +275,10 @@ async fn es_test() {
 #[tokio::test]
 async fn ss_test() {
     let repository = InMemoryOrderStateRepository::new();
-    let aggregate = Arc::new(StateStoredAggregate::new(repository, decider()));
+    let aggregate = Arc::new(StateStoredAggregate::new(
+        repository,
+        decider().map_error(&|()| AggregateError::DomainError("Decider error".to_string())),
+    ));
     let aggregate2 = Arc::clone(&aggregate);
 
     let handle1 = thread::spawn(|| async move {

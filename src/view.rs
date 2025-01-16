@@ -127,7 +127,7 @@ impl<'a, S, E> View<'a, S, E> {
 
     /// Combines two views into one.
     /// Creates a new instance of a View by combining two views of type `S`, `E` and `S2`, `E2` into a new view of type `(S, S2)`, `Sum<E, E2>`
-    pub fn combine<S2: Clone, E2>(self, view2: View<'a, S2, E2>) -> View<'a, (S, S2), Sum<E, E2>>
+    pub fn combine<S2, E2>(self, view2: View<'a, S2, E2>) -> View<'a, (S, S2), Sum<E, E2>>
     where
         S: Clone,
         S2: Clone,
@@ -164,7 +164,7 @@ pub trait ViewStateComputation<E, S> {
     fn compute_new_state(&self, current_state: Option<S>, events: &[&E]) -> S;
 }
 
-impl<'a, S, E> ViewStateComputation<E, S> for View<'a, S, E> {
+impl<S, E> ViewStateComputation<E, S> for View<'_, S, E> {
     /// Computes new state based on the current state and the events.
     fn compute_new_state(&self, current_state: Option<S>, events: &[&E]) -> S {
         let effective_current_state = current_state.unwrap_or_else(|| (self.initial_state)());

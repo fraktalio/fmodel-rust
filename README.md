@@ -53,9 +53,9 @@ construct.
 Abstraction and generalization are often used together. Abstracts are generalized through parameterization to provide
 more excellent utility.
 
-## `Box<dyn Fn(&C, &S) -> Vec<E>>`
+## `Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error>`
 
-`type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>`
+`type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error> + 'a + Send + Sync>`
 
 On a higher level of abstraction, any information system is responsible for handling the intent (`Command`) and based on
 the current `State`, produce new facts (`Events`):

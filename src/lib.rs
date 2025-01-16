@@ -223,33 +223,33 @@
 //!         decide: Box::new(|command, state| match command {
 //!             // Exhaustive pattern matching on the command
 //!             OrderCommand::Create(create_cmd) => {
-//!                 vec![OrderEvent::Created(OrderCreatedEvent {
+//!                 Ok(vec![OrderEvent::Created(OrderCreatedEvent {
 //!                     order_id: create_cmd.order_id,
 //!                     customer_name: create_cmd.customer_name.to_owned(),
 //!                     items: create_cmd.items.to_owned(),
-//!                 })]
+//!                 })])
 //!             }
 //!             OrderCommand::Update(update_cmd) => {
 //!                 // Your validation logic goes here
 //!                 if state.order_id == update_cmd.order_id {
-//!                     vec![OrderEvent::Updated(OrderUpdatedEvent {
+//!                     Ok(vec![OrderEvent::Updated(OrderUpdatedEvent {
 //!                         order_id: update_cmd.order_id,
 //!                         updated_items: update_cmd.new_items.to_owned(),
-//!                     })]
+//!                     })])
 //!                 } else {
 //!                     // In case of validation failure, return empty list of events or error event
-//!                     vec![]
+//!                     Ok(vec![])
 //!                 }
 //!             }
 //!             OrderCommand::Cancel(cancel_cmd) => {
 //!                 // Your validation logic goes here
 //!                 if state.order_id == cancel_cmd.order_id {
-//!                     vec![OrderEvent::Cancelled(OrderCancelledEvent {
+//!                     Ok(vec![OrderEvent::Cancelled(OrderCancelledEvent {
 //!                         order_id: cancel_cmd.order_id,
-//!                     })]
+//!                     })])
 //!                 } else {
 //!                     // In case of validation failure, return empty list of events or error event
-//!                     vec![]
+//!                     Ok(vec![])
 //!                 }
 //!             }
 //!         }),
@@ -323,7 +323,8 @@ pub mod saga_manager;
 pub mod view;
 
 /// The [DecideFunction] function is used to decide which events to produce based on the command and the current state.
-pub type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>;
+pub type DecideFunction<'a, C, S, E, Error> =
+    Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error> + 'a + Send + Sync>;
 /// The [EvolveFunction] function is used to evolve the state based on the current state and the event.
 pub type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>;
 /// The [InitialStateFunction] function is used to produce the initial state.
