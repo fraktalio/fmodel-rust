@@ -106,6 +106,7 @@ pub fn sum_to_event(event: &Sum<OrderEvent, ShipmentEvent>) -> Event {
 }
 
 /// A trait to provide a way to get the id of the messages/entities
+#[allow(dead_code)]
 pub trait Id {
     fn id(&self) -> u32;
 }
@@ -148,6 +149,7 @@ impl Id for (OrderViewState, ShipmentViewState) {
 #[derive(Debug, Display)]
 #[allow(dead_code)]
 pub enum AggregateError {
+    DomainError(String),
     FetchEvents(String),
     SaveEvents(String),
     FetchState(String),

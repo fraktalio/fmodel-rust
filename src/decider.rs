@@ -14,29 +14,29 @@ use crate::{DecideFunction, EvolveFunction, InitialStateFunction, Sum};
 ///         decide: Box::new(|command, state| {
 ///            match command {
 ///                 OrderCommand::Create(create_cmd) => {
-///                     vec![OrderEvent::Created(OrderCreatedEvent {
+///                     Ok(vec![OrderEvent::Created(OrderCreatedEvent {
 ///                         order_id: create_cmd.order_id,
 ///                         customer_name: create_cmd.customer_name.to_owned(),
 ///                         items: create_cmd.items.to_owned(),
-///                     })]
+///                     })])
 ///                 }
 ///                 OrderCommand::Update(update_cmd) => {
 ///                     if state.order_id == update_cmd.order_id {
-///                         vec![OrderEvent::Updated(OrderUpdatedEvent {
+///                         Ok(vec![OrderEvent::Updated(OrderUpdatedEvent {
 ///                             order_id: update_cmd.order_id,
 ///                             updated_items: update_cmd.new_items.to_owned(),
-///                         })]
+///                         })])
 ///                     } else {
-///                         vec![]
+///                         Ok(vec![])
 ///                     }
 ///                 }
 ///                 OrderCommand::Cancel(cancel_cmd) => {
 ///                     if state.order_id == cancel_cmd.order_id {
-///                         vec![OrderEvent::Cancelled(OrderCancelledEvent {
+///                         Ok(vec![OrderEvent::Cancelled(OrderCancelledEvent {
 ///                             order_id: cancel_cmd.order_id,
-///                         })]
+///                         })])
 ///                     } else {
-///                         vec![]
+///                         Ok(vec![])
 ///                     }
 ///                 }
 ///             }
@@ -134,33 +134,33 @@ use crate::{DecideFunction, EvolveFunction, InitialStateFunction, Sum};
 ///     items: vec!["Item 1".to_string(), "Item 2".to_string()],
 /// });
 /// let new_events = decider.compute_new_events(&[], &create_order_command);
-///     assert_eq!(new_events, [OrderEvent::Created(OrderCreatedEvent {
+///     assert_eq!(new_events, Ok(vec![OrderEvent::Created(OrderCreatedEvent {
 ///         order_id: 1,
 ///         customer_name: "John Doe".to_string(),
 ///         items: vec!["Item 1".to_string(), "Item 2".to_string()],
-///     })]);
+///     })]));
 ///     let new_state = decider.compute_new_state(None, &create_order_command);
-///     assert_eq!(new_state, OrderState {
+///     assert_eq!(new_state, Ok(OrderState {
 ///         order_id: 1,
 ///         customer_name: "John Doe".to_string(),
 ///         items: vec!["Item 1".to_string(), "Item 2".to_string()],
 ///         is_cancelled: false,
-///     });
+///     }));
 ///
 /// ```
-pub struct Decider<'a, C: 'a, S: 'a, E: 'a> {
+pub struct Decider<'a, C: 'a, S: 'a, E: 'a, Error: 'a = ()> {
     /// The `decide` function is used to decide which events to produce based on the command and the current state.
-    pub decide: DecideFunction<'a, C, S, E>,
+    pub decide: DecideFunction<'a, C, S, E, Error>,
     /// The `evolve` function is used to evolve the state based on the current state and the event.
     pub evolve: EvolveFunction<'a, S, E>,
     /// The `initial_state` function is used to produce the initial state of the decider.
     pub initial_state: InitialStateFunction<'a, S>,
 }
 
-impl<'a, C, S, E> Decider<'a, C, S, E> {
+impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
     /// Maps the Decider over the S/State type parameter.
-    /// Creates a new instance of [Decider]`<C, S2, E>`.
-    pub fn map_state<S2, F1, F2>(self, f1: &'a F1, f2: &'a F2) -> Decider<'a, C, S2, E>
+    /// Creates a new instance of [Decider]`<C, S2, E, Error>`.
+    pub fn map_state<S2, F1, F2>(self, f1: &'a F1, f2: &'a F2) -> Decider<'a, C, S2, E, Error>
     where
         F1: Fn(&S2) -> S + Send + Sync,
         F2: Fn(&S) -> S2 + Send + Sync,
@@ -185,14 +185,14 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
     }
 
     /// Maps the Decider over the E/Event type parameter.
-    /// Creates a new instance of [Decider]`<C, S, E2>`.
-    pub fn map_event<E2, F1, F2>(self, f1: &'a F1, f2: &'a F2) -> Decider<'a, C, S, E2>
+    /// Creates a new instance of [Decider]`<C, S, E2, Error>`.
+    pub fn map_event<E2, F1, F2>(self, f1: &'a F1, f2: &'a F2) -> Decider<'a, C, S, E2, Error>
     where
         F1: Fn(&E2) -> E + Send + Sync,
         F2: Fn(&E) -> E2 + Send + Sync,
     {
         let new_decide = Box::new(move |c: &C, s: &S| {
-            (self.decide)(c, s).into_iter().map(|e: E| f2(&e)).collect()
+            (self.decide)(c, s).map(|result| result.into_iter().map(|e: E| f2(&e)).collect())
         });
 
         let new_evolve = Box::new(move |s: &S, e2: &E2| {
@@ -210,8 +210,8 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
     }
 
     /// Maps the Decider over the C/Command type parameter.
-    /// Creates a new instance of [Decider]`<C2, S, E>`.
-    pub fn map_command<C2, F>(self, f: &'a F) -> Decider<'a, C2, S, E>
+    /// Creates a new instance of [Decider]`<C2, S, E, Error>`.
+    pub fn map_command<C2, F>(self, f: &'a F) -> Decider<'a, C2, S, E, Error>
     where
         F: Fn(&C2) -> C + Send + Sync,
     {
@@ -231,12 +231,32 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
         }
     }
 
+    /// Maps the Decider over the Error type parameter.
+    /// Creates a new instance of [Decider]`<C, S, E, Error2>`.
+    pub fn map_error<Error2, F>(self, f: &'a F) -> Decider<'a, C, S, E, Error2>
+    where
+        F: Fn(&Error) -> Error2 + Send + Sync,
+    {
+        let new_decide = Box::new(move |c: &C, s: &S| (self.decide)(c, s).map_err(|e| f(&e)));
+
+        let new_evolve = Box::new(move |s: &S, e: &E| (self.evolve)(s, e));
+
+        let new_initial_state = Box::new(move || (self.initial_state)());
+
+        Decider {
+            decide: new_decide,
+            evolve: new_evolve,
+            initial_state: new_initial_state,
+        }
+    }
+
     /// Combines two deciders into one bigger decider
     /// Creates a new instance of a Decider by combining two deciders of type `C`, `S`, `E` and `C2`, `S2`, `E2` into a new decider of type `Sum<C, C2>`, `(S, S2)`, `Sum<E, E2>`
+    #[allow(clippy::type_complexity)]
     pub fn combine<C2, S2, E2>(
         self,
-        decider2: Decider<'a, C2, S2, E2>,
-    ) -> Decider<'a, Sum<C, C2>, (S, S2), Sum<E, E2>>
+        decider2: Decider<'a, C2, S2, E2, Error>,
+    ) -> Decider<'a, Sum<C, C2>, (S, S2), Sum<E, E2>, Error>
     where
         S: Clone,
         S2: Clone,
@@ -245,18 +265,22 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
             Sum::First(c) => {
                 let s1 = &s.0;
                 let events = (self.decide)(c, s1);
-                events
-                    .into_iter()
-                    .map(|e: E| Sum::First(e))
-                    .collect::<Vec<Sum<E, E2>>>()
+                events.map(|result| {
+                    result
+                        .into_iter()
+                        .map(|e: E| Sum::First(e))
+                        .collect::<Vec<Sum<E, E2>>>()
+                })
             }
             Sum::Second(c) => {
                 let s2 = &s.1;
                 let events = (decider2.decide)(c, s2);
-                events
-                    .into_iter()
-                    .map(|e: E2| Sum::Second(e))
-                    .collect::<Vec<Sum<E, E2>>>()
+                events.map(|result| {
+                    result
+                        .into_iter()
+                        .map(|e: E2| Sum::Second(e))
+                        .collect::<Vec<Sum<E, E2>>>()
+                })
             }
         });
 
@@ -288,20 +312,20 @@ impl<'a, C, S, E> Decider<'a, C, S, E> {
 }
 
 /// Formalizes the `Event Computation` algorithm / event sourced system for the `decider` to handle commands based on the current events, and produce new events.
-pub trait EventComputation<C, S, E> {
+pub trait EventComputation<C, S, E, Error = ()> {
     /// Computes new events based on the current events and the command.
-    fn compute_new_events(&self, current_events: &[E], command: &C) -> Vec<E>;
+    fn compute_new_events(&self, current_events: &[E], command: &C) -> Result<Vec<E>, Error>;
 }
 
 /// Formalizes the `State Computation` algorithm / state-stored system for the `decider` to handle commands based on the current state, and produce new state.
-pub trait StateComputation<C, S, E> {
+pub trait StateComputation<C, S, E, Error = ()> {
     /// Computes new state based on the current state and the command.
-    fn compute_new_state(&self, current_state: Option<S>, command: &C) -> S;
+    fn compute_new_state(&self, current_state: Option<S>, command: &C) -> Result<S, Error>;
 }
 
-impl<'a, C, S, E> EventComputation<C, S, E> for Decider<'a, C, S, E> {
+impl<C, S, E, Error> EventComputation<C, S, E, Error> for Decider<'_, C, S, E, Error> {
     /// Computes new events based on the current events and the command.
-    fn compute_new_events(&self, current_events: &[E], command: &C) -> Vec<E> {
+    fn compute_new_events(&self, current_events: &[E], command: &C) -> Result<Vec<E>, Error> {
         let current_state: S = current_events
             .iter()
             .fold((self.initial_state)(), |state, event| {
@@ -311,15 +335,17 @@ impl<'a, C, S, E> EventComputation<C, S, E> for Decider<'a, C, S, E> {
     }
 }
 
-impl<'a, C, S, E> StateComputation<C, S, E> for Decider<'a, C, S, E> {
+impl<C, S, E, Error> StateComputation<C, S, E, Error> for Decider<'_, C, S, E, Error> {
     /// Computes new state based on the current state and the command.
-    fn compute_new_state(&self, current_state: Option<S>, command: &C) -> S {
+    fn compute_new_state(&self, current_state: Option<S>, command: &C) -> Result<S, Error> {
         let effective_current_state = current_state.unwrap_or_else(|| (self.initial_state)());
         let events = (self.decide)(command, &effective_current_state);
-        events
-            .into_iter()
-            .fold(effective_current_state, |state, event| {
-                (self.evolve)(&state, &event)
-            })
+        events.map(|result| {
+            result
+                .into_iter()
+                .fold(effective_current_state, |state, event| {
+                    (self.evolve)(&state, &event)
+                })
+        })
     }
 }

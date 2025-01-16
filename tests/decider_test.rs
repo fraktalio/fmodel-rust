@@ -15,30 +15,28 @@ mod application;
 fn order_decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
     Decider {
         decide: Box::new(|command, state| match command {
-            OrderCommand::Create(cmd) => {
-                vec![OrderEvent::Created(OrderCreatedEvent {
-                    order_id: cmd.order_id,
-                    customer_name: cmd.customer_name.to_owned(),
-                    items: cmd.items.to_owned(),
-                })]
-            }
+            OrderCommand::Create(cmd) => Ok(vec![OrderEvent::Created(OrderCreatedEvent {
+                order_id: cmd.order_id,
+                customer_name: cmd.customer_name.to_owned(),
+                items: cmd.items.to_owned(),
+            })]),
             OrderCommand::Update(cmd) => {
                 if state.order_id == cmd.order_id {
-                    vec![OrderEvent::Updated(OrderUpdatedEvent {
+                    Ok(vec![OrderEvent::Updated(OrderUpdatedEvent {
                         order_id: cmd.order_id,
                         updated_items: cmd.new_items.to_owned(),
-                    })]
+                    })])
                 } else {
-                    vec![]
+                    Ok(vec![])
                 }
             }
             OrderCommand::Cancel(cmd) => {
                 if state.order_id == cmd.order_id {
-                    vec![OrderEvent::Cancelled(OrderCancelledEvent {
+                    Ok(vec![OrderEvent::Cancelled(OrderCancelledEvent {
                         order_id: cmd.order_id,
-                    })]
+                    })])
                 } else {
-                    vec![]
+                    Ok(vec![])
                 }
             }
         }),
@@ -72,12 +70,12 @@ fn shipment_decider<'a>() -> Decider<'a, ShipmentCommand, ShipmentState, Shipmen
     Decider {
         decide: Box::new(|command, _state| match command {
             ShipmentCommand::Create(cmd) => {
-                vec![ShipmentEvent::Created(ShipmentCreatedEvent {
+                Ok(vec![ShipmentEvent::Created(ShipmentCreatedEvent {
                     shipment_id: cmd.shipment_id,
                     order_id: cmd.order_id,
                     customer_name: cmd.customer_name.to_owned(),
                     items: cmd.items.to_owned(),
-                })]
+                })])
             }
         }),
         evolve: Box::new(|state, event| {
@@ -131,34 +129,34 @@ fn test() {
         order_decider.compute_new_events(&[], &OrderCommand::Create(create_order_command.clone()));
     assert_eq!(
         new_events,
-        [OrderEvent::Created(OrderCreatedEvent {
+        Ok(vec![OrderEvent::Created(OrderCreatedEvent {
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
-        })]
+        })])
     );
     // Test the Decider that combines OrderDecider and ShipmentDecider and can handle both OrderCommand and ShipmentCommand and produce Event
     let new_events2 =
         combined_decider.compute_new_events(&[], &OrderCreate(create_order_command.clone()));
     assert_eq!(
         new_events2,
-        [OrderCreated(OrderCreatedEvent {
+        Ok(vec![OrderCreated(OrderCreatedEvent {
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
-        })]
+        })])
     );
     // Test the Decider that combines OrderDecider and ShipmentDecider and can handle both OrderCommand and ShipmentCommand and produce Event
     let new_events3 =
         combined_decider.compute_new_events(&[], &ShipmentCreate(create_shipment_command.clone()));
     assert_eq!(
         new_events3,
-        [ShipmentCreated(ShipmentCreatedEvent {
+        Ok(vec![ShipmentCreated(ShipmentCreatedEvent {
             shipment_id: 1,
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
-        })]
+        })])
     );
 
     // Test the OrderDecider
@@ -166,19 +164,19 @@ fn test() {
         order_decider.compute_new_state(None, &OrderCommand::Create(create_order_command.clone()));
     assert_eq!(
         new_state,
-        OrderState {
+        Ok(OrderState {
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
             is_cancelled: false,
-        }
+        })
     );
     // Test the Decider that combines OrderDecider and ShipmentDecider and can handle both OrderCommand and ShipmentCommand and produce a tuple of (OrderState, ShipmentState)
     let new_state2 =
         combined_decider.compute_new_state(None, &ShipmentCreate(create_shipment_command.clone()));
     assert_eq!(
         new_state2,
-        (
+        Ok((
             OrderState {
                 order_id: 0,
                 customer_name: "".to_string(),
@@ -191,25 +189,27 @@ fn test() {
                 customer_name: "John Doe".to_string(),
                 items: vec!["Item 1".to_string(), "Item 2".to_string()],
             }
-        )
+        ))
     );
 
     // Test the OrderDecider
     let cancel_command = OrderCommand::Cancel(CancelOrderCommand { order_id: 1 });
-    let new_events = order_decider.compute_new_events(&new_events, &cancel_command);
+    let new_events = order_decider.compute_new_events(&new_events.unwrap(), &cancel_command);
     assert_eq!(
         new_events,
-        [OrderEvent::Cancelled(OrderCancelledEvent { order_id: 1 })]
+        Ok(vec![OrderEvent::Cancelled(OrderCancelledEvent {
+            order_id: 1
+        })])
     );
     // Test the OrderDecider
-    let new_state = order_decider.compute_new_state(Some(new_state), &cancel_command);
+    let new_state = order_decider.compute_new_state(Some(new_state.unwrap()), &cancel_command);
     assert_eq!(
         new_state,
-        OrderState {
+        Ok(OrderState {
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
             is_cancelled: true,
-        }
+        })
     );
 }
