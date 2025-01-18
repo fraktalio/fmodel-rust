@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
 use fmodel_rust::aggregate::{
-    EventRepository, EventSourcedAggregate, StateRepository, StateStoredAggregate,
-    StateStoredOrchestratingAggregate,
+    EventRepository, EventSourcedAggregate, EventSourcedOrchestratingAggregate, StateRepository,
+    StateStoredAggregate, StateStoredOrchestratingAggregate,
 };
 use fmodel_rust::decider::Decider;
 use fmodel_rust::saga::Saga;
@@ -24,13 +24,13 @@ mod application;
 
 /// A simple in-memory event repository - infrastructure
 struct InMemoryEventRepository {
-    events: Mutex<Vec<(Event, i32)>>,
+    events: RwLock<Vec<(Event, i32)>>,
 }
 
 impl InMemoryEventRepository {
     fn new() -> Self {
         InMemoryEventRepository {
-            events: Mutex::new(vec![]),
+            events: RwLock::new(vec![]),
         }
     }
 }
@@ -40,7 +40,7 @@ impl EventRepository<Command, Event, i32, AggregateError> for InMemoryEventRepos
     async fn fetch_events(&self, command: &Command) -> Result<Vec<(Event, i32)>, AggregateError> {
         Ok(self
             .events
-            .lock()
+            .read()
             .unwrap()
             .clone()
             .into_iter()
@@ -48,12 +48,11 @@ impl EventRepository<Command, Event, i32, AggregateError> for InMemoryEventRepos
             .collect())
     }
 
-    async fn save(
-        &self,
-        events: &[Event],
-        latest_version: &Option<i32>,
-    ) -> Result<Vec<(Event, i32)>, AggregateError> {
-        let mut latest_version = latest_version.to_owned().unwrap_or(-1);
+    async fn save(&self, events: &[Event]) -> Result<Vec<(Event, i32)>, AggregateError> {
+        let mut latest_version = self
+            .version_provider(events.first().unwrap())
+            .await?
+            .unwrap_or(-1);
         let events = events
             .iter()
             .map(|event| {
@@ -63,10 +62,22 @@ impl EventRepository<Command, Event, i32, AggregateError> for InMemoryEventRepos
             .collect::<Vec<(Event, i32)>>();
 
         self.events
-            .lock()
+            .write()
             .unwrap()
             .extend_from_slice(&events.clone());
         Ok(events)
+    }
+
+    async fn version_provider(&self, event: &Event) -> Result<Option<i32>, AggregateError> {
+        Ok(self
+            .events
+            .read()
+            .unwrap()
+            .clone()
+            .into_iter()
+            .filter(|(e, _)| e.id() == event.id())
+            .map(|(_, version)| version)
+            .last())
     }
 }
 
@@ -117,16 +128,10 @@ fn order_decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
                 customer_name: cmd.customer_name.to_owned(),
                 items: cmd.items.to_owned(),
             })]),
-            OrderCommand::Update(cmd) => {
-                if state.order_id == cmd.order_id {
-                    Ok(vec![OrderEvent::Updated(OrderUpdatedEvent {
-                        order_id: cmd.order_id,
-                        updated_items: cmd.new_items.to_owned(),
-                    })])
-                } else {
-                    Ok(vec![])
-                }
-            }
+            OrderCommand::Update(cmd) => Ok(vec![OrderEvent::Updated(OrderUpdatedEvent {
+                order_id: cmd.order_id,
+                updated_items: cmd.new_items.to_owned(),
+            })]),
             OrderCommand::Cancel(cmd) => {
                 if state.order_id == cmd.order_id {
                     Ok(vec![OrderEvent::Cancelled(OrderCancelledEvent {
@@ -146,10 +151,14 @@ fn order_decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
                     new_state.items = evt.items.to_owned();
                 }
                 OrderEvent::Updated(evt) => {
-                    new_state.items = evt.updated_items.to_owned();
+                    if new_state.order_id == evt.order_id {
+                        new_state.items = evt.updated_items.to_owned();
+                    }
                 }
-                OrderEvent::Cancelled(_) => {
-                    new_state.is_cancelled = true;
+                OrderEvent::Cancelled(evt) => {
+                    if new_state.order_id == evt.order_id {
+                        new_state.is_cancelled = true;
+                    }
                 }
             }
             new_state
@@ -338,6 +347,162 @@ async fn event_sourced_aggregate_test() {
             [(
                 Event::OrderCancelled(OrderCancelledEvent { order_id: 2 }),
                 2
+            )]
+        );
+    });
+
+    handle1.join().unwrap().await;
+    handle2.join().unwrap().await;
+}
+
+#[tokio::test]
+async fn orchestrated_event_sourced_aggregate_test() {
+    let combined_decider = order_decider()
+        .combine(shipment_decider()) // Decider<Sum<OrderCommand, ShipmentCommand>, (OrderState, ShipmentState), Sum<OrderEvent, ShipmentEvent>>
+        .map_command(&command_from_sum) // Decider<Command, (OrderState, ShipmentState), Sum<OrderEvent, ShipmentEvent>>
+        .map_event(&event_from_sum, &sum_to_event); // Decider<Command, (OrderState, ShipmentState), Event>
+    let combined_saga = order_saga()
+        .combine(shipment_saga())
+        .map_action(&sum_to_command)
+        .map_action_result(&event_from_sum);
+    let repository = InMemoryEventRepository::new();
+    let aggregate = Arc::new(EventSourcedOrchestratingAggregate::new(
+        repository,
+        combined_decider.map_error(&|()| AggregateError::DomainError("Decider error".to_string())),
+        combined_saga,
+    ));
+    // Makes a clone of the Arc pointer.
+    // This creates another pointer to the same allocation, increasing the strong reference count.
+    let aggregate2 = Arc::clone(&aggregate);
+
+    // Let's spawn two threads to simulate two concurrent requests
+    let handle1 = thread::spawn(|| async move {
+        let command = Command::OrderCreate(CreateOrderCommand {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [
+                (
+                    Event::OrderCreated(OrderCreatedEvent {
+                        order_id: 1,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }),
+                    0
+                ),
+                (
+                    Event::ShipmentCreated(ShipmentCreatedEvent {
+                        shipment_id: 1,
+                        order_id: 1,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }),
+                    1
+                ),
+                (
+                    Event::OrderUpdated(OrderUpdatedEvent {
+                        order_id: 1,
+                        updated_items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }),
+                    2
+                ),
+            ]
+        );
+        let command = Command::OrderUpdate(UpdateOrderCommand {
+            order_id: 1,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                Event::OrderUpdated(OrderUpdatedEvent {
+                    order_id: 1,
+                    updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                }),
+                3
+            )]
+        );
+        let command = Command::OrderCancel(CancelOrderCommand { order_id: 1 });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                Event::OrderCancelled(OrderCancelledEvent { order_id: 1 }),
+                4
+            )]
+        );
+    });
+
+    let handle2 = thread::spawn(|| async move {
+        let command = Command::OrderCreate(CreateOrderCommand {
+            order_id: 2,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [
+                (
+                    Event::OrderCreated(OrderCreatedEvent {
+                        order_id: 2,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }),
+                    0
+                ),
+                (
+                    Event::ShipmentCreated(ShipmentCreatedEvent {
+                        shipment_id: 2,
+                        order_id: 2,
+                        customer_name: "John Doe".to_string(),
+                        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }),
+                    1
+                ),
+                (
+                    Event::OrderUpdated(OrderUpdatedEvent {
+                        order_id: 2,
+                        updated_items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                    }),
+                    2
+                ),
+            ]
+        );
+        let command = Command::OrderUpdate(UpdateOrderCommand {
+            order_id: 2,
+            new_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                Event::OrderUpdated(OrderUpdatedEvent {
+                    order_id: 2,
+                    updated_items: vec!["Item 3".to_string(), "Item 4".to_string()],
+                }),
+                3
+            )]
+        );
+        let command = Command::OrderCancel(CancelOrderCommand { order_id: 2 });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            [(
+                Event::OrderCancelled(OrderCancelledEvent { order_id: 2 }),
+                4
             )]
         );
     });

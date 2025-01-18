@@ -47,12 +47,11 @@ impl EventRepository<OrderCommand, OrderEvent, i32, AggregateError>
             .collect())
     }
 
-    async fn save(
-        &self,
-        events: &[OrderEvent],
-        latest_version: &Option<i32>,
-    ) -> Result<Vec<(OrderEvent, i32)>, AggregateError> {
-        let mut latest_version = latest_version.to_owned().unwrap_or(-1);
+    async fn save(&self, events: &[OrderEvent]) -> Result<Vec<(OrderEvent, i32)>, AggregateError> {
+        let mut latest_version = self
+            .version_provider(events.first().unwrap())
+            .await?
+            .unwrap_or(-1);
         let events = events
             .iter()
             .map(|event| {
@@ -66,6 +65,18 @@ impl EventRepository<OrderCommand, OrderEvent, i32, AggregateError>
             .unwrap()
             .extend_from_slice(&events.clone());
         Ok(events)
+    }
+
+    async fn version_provider(&self, event: &OrderEvent) -> Result<Option<i32>, AggregateError> {
+        Ok(self
+            .events
+            .lock()
+            .unwrap()
+            .clone()
+            .into_iter()
+            .filter(|(e, _)| e.id() == event.id())
+            .map(|(_, version)| version)
+            .last())
     }
 }
 
