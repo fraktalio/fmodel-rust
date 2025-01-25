@@ -4,6 +4,7 @@ use std::thread;
 
 use fmodel_rust::materialized_view::{MaterializedView, ViewStateRepository};
 use fmodel_rust::view::View;
+use fmodel_rust::Identifier;
 
 use crate::api::{
     OrderCancelledEvent, OrderCreatedEvent, OrderEvent, OrderUpdatedEvent, OrderViewState,
@@ -61,7 +62,12 @@ impl ViewStateRepository<OrderEvent, OrderViewState, MaterializedViewError>
         &self,
         event: &OrderEvent,
     ) -> Result<Option<OrderViewState>, MaterializedViewError> {
-        Ok(self.states.lock().unwrap().get(&event.id()).cloned())
+        Ok(self
+            .states
+            .lock()
+            .unwrap()
+            .get(&event.identifier().parse::<u32>().unwrap())
+            .cloned())
     }
 
     async fn save(&self, state: &OrderViewState) -> Result<OrderViewState, MaterializedViewError> {

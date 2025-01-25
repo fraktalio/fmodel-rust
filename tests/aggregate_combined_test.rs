@@ -8,6 +8,7 @@ use fmodel_rust::aggregate::{
 };
 use fmodel_rust::decider::Decider;
 use fmodel_rust::saga::Saga;
+use fmodel_rust::Identifier;
 
 use crate::api::{
     CancelOrderCommand, CreateOrderCommand, CreateShipmentCommand, OrderCancelledEvent,
@@ -16,7 +17,6 @@ use crate::api::{
 };
 use crate::application::{
     command_from_sum, event_from_sum, sum_to_command, sum_to_event, AggregateError, Command, Event,
-    Id,
 };
 
 mod api;
@@ -44,7 +44,7 @@ impl EventRepository<Command, Event, i32, AggregateError> for InMemoryEventRepos
             .unwrap()
             .clone()
             .into_iter()
-            .filter(|(event, _)| event.id() == command.id())
+            .filter(|(event, _)| event.identifier() == command.identifier())
             .collect())
     }
 
@@ -75,7 +75,7 @@ impl EventRepository<Command, Event, i32, AggregateError> for InMemoryEventRepos
             .unwrap()
             .clone()
             .into_iter()
-            .filter(|(e, _)| e.id() == event.id())
+            .filter(|(e, _)| e.identifier() == event.identifier())
             .map(|(_, version)| version)
             .last())
     }
@@ -102,7 +102,12 @@ impl StateRepository<Command, (OrderState, ShipmentState), i32, AggregateError>
         &self,
         command: &Command,
     ) -> Result<Option<((OrderState, ShipmentState), i32)>, AggregateError> {
-        Ok(self.states.lock().unwrap().get(&command.id()).cloned())
+        Ok(self
+            .states
+            .lock()
+            .unwrap()
+            .get(&command.identifier().parse::<u32>().unwrap())
+            .cloned())
     }
 
     async fn save(
@@ -114,7 +119,7 @@ impl StateRepository<Command, (OrderState, ShipmentState), i32, AggregateError>
         self.states
             .lock()
             .unwrap()
-            .insert(state.id(), (state.clone(), version + 1));
+            .insert(state.0.order_id, (state.clone(), version + 1));
         Ok((state.clone(), version))
     }
 }
