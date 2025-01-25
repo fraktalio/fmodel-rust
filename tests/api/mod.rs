@@ -2,6 +2,8 @@
 // ############################ Order API ############################
 // ###################################################################
 
+use fmodel_rust::Identifier;
+
 /// The state of the Order entity
 #[derive(Debug, Clone, PartialEq)]
 pub struct OrderState {
@@ -47,14 +49,13 @@ pub struct CancelOrderCommand {
     pub order_id: u32,
 }
 
-/// Provides a way to get the id of the Order commands
-impl OrderCommand {
+impl Identifier for OrderCommand {
     #[allow(dead_code)]
-    pub fn id(&self) -> u32 {
+    fn identifier(&self) -> String {
         match self {
-            OrderCommand::Create(c) => c.order_id.to_owned(),
-            OrderCommand::Update(c) => c.order_id.to_owned(),
-            OrderCommand::Cancel(c) => c.order_id.to_owned(),
+            OrderCommand::Create(c) => c.order_id.to_string(),
+            OrderCommand::Update(c) => c.order_id.to_string(),
+            OrderCommand::Cancel(c) => c.order_id.to_string(),
         }
     }
 }
@@ -87,13 +88,13 @@ pub struct OrderCancelledEvent {
 }
 
 /// Provides a way to get the id of the Order events
-impl OrderEvent {
+impl Identifier for OrderEvent {
     #[allow(dead_code)]
-    pub fn id(&self) -> u32 {
+    fn identifier(&self) -> String {
         match self {
-            OrderEvent::Created(c) => c.order_id.to_owned(),
-            OrderEvent::Updated(c) => c.order_id.to_owned(),
-            OrderEvent::Cancelled(c) => c.order_id.to_owned(),
+            OrderEvent::Created(c) => c.order_id.to_string(),
+            OrderEvent::Updated(c) => c.order_id.to_string(),
+            OrderEvent::Cancelled(c) => c.order_id.to_string(),
         }
     }
 }
@@ -136,11 +137,11 @@ pub struct CreateShipmentCommand {
 }
 
 /// Provides a way to get the id of the Shipment commands
-impl ShipmentCommand {
+impl Identifier for ShipmentCommand {
     #[allow(dead_code)]
-    pub fn id(&self) -> u32 {
+    fn identifier(&self) -> String {
         match self {
-            ShipmentCommand::Create(c) => c.shipment_id.to_owned(),
+            ShipmentCommand::Create(c) => c.shipment_id.to_string(),
         }
     }
 }

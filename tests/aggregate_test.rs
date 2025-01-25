@@ -6,6 +6,7 @@ use fmodel_rust::aggregate::{
     EventRepository, EventSourcedAggregate, StateRepository, StateStoredAggregate,
 };
 use fmodel_rust::decider::Decider;
+use fmodel_rust::Identifier;
 
 use crate::api::{
     CancelOrderCommand, CreateOrderCommand, OrderCancelledEvent, OrderCommand, OrderCreatedEvent,
@@ -43,7 +44,7 @@ impl EventRepository<OrderCommand, OrderEvent, i32, AggregateError>
             .unwrap()
             .clone()
             .into_iter()
-            .filter(|(event, _)| event.id() == command.id())
+            .filter(|(event, _)| event.identifier() == command.identifier())
             .collect())
     }
 
@@ -74,7 +75,7 @@ impl EventRepository<OrderCommand, OrderEvent, i32, AggregateError>
             .unwrap()
             .clone()
             .into_iter()
-            .filter(|(e, _)| e.id() == event.id())
+            .filter(|(e, _)| e.identifier() == event.identifier())
             .map(|(_, version)| version)
             .last())
     }
@@ -100,7 +101,12 @@ impl StateRepository<OrderCommand, OrderState, i32, AggregateError>
         &self,
         command: &OrderCommand,
     ) -> Result<Option<(OrderState, i32)>, AggregateError> {
-        Ok(self.states.lock().unwrap().get(&command.id()).cloned())
+        Ok(self
+            .states
+            .lock()
+            .unwrap()
+            .get(&command.identifier().parse::<u32>().unwrap())
+            .cloned())
     }
 
     async fn save(

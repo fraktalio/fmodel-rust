@@ -1,12 +1,11 @@
 use derive_more::Display;
-use fmodel_rust::Sum;
+use fmodel_rust::{Identifier, Sum};
 use std::error::Error;
 
 use crate::api::{
     CancelOrderCommand, CreateOrderCommand, CreateShipmentCommand, OrderCancelledEvent,
-    OrderCommand, OrderCreatedEvent, OrderEvent, OrderState, OrderUpdatedEvent, OrderViewState,
-    ShipmentCommand, ShipmentCreatedEvent, ShipmentEvent, ShipmentState, ShipmentViewState,
-    UpdateOrderCommand,
+    OrderCommand, OrderCreatedEvent, OrderEvent, OrderUpdatedEvent, ShipmentCommand,
+    ShipmentCreatedEvent, ShipmentEvent, UpdateOrderCommand,
 };
 
 /// The command enum for all the domain commands (shipment and order)
@@ -105,43 +104,25 @@ pub fn sum_to_event(event: &Sum<OrderEvent, ShipmentEvent>) -> Event {
     }
 }
 
-/// A trait to provide a way to get the id of the messages/entities
-#[allow(dead_code)]
-pub trait Id {
-    fn id(&self) -> u32;
-}
-
-impl Id for Event {
-    fn id(&self) -> u32 {
+impl Identifier for Event {
+    fn identifier(&self) -> String {
         match self {
-            Event::OrderCreated(event) => event.order_id,
-            Event::OrderCancelled(event) => event.order_id,
-            Event::OrderUpdated(event) => event.order_id,
-            Event::ShipmentCreated(event) => event.shipment_id,
+            Event::ShipmentCreated(evt) => evt.shipment_id.to_string(),
+            Event::OrderCreated(evt) => evt.order_id.to_string(),
+            Event::OrderUpdated(evt) => evt.order_id.to_string(),
+            Event::OrderCancelled(evt) => evt.order_id.to_string(),
         }
     }
 }
 
-impl Id for Command {
-    fn id(&self) -> u32 {
+impl Identifier for Command {
+    fn identifier(&self) -> String {
         match self {
-            Command::OrderCreate(cmd) => cmd.order_id,
-            Command::OrderUpdate(cmd) => cmd.order_id,
-            Command::OrderCancel(cmd) => cmd.order_id,
-            Command::ShipmentCreate(cmd) => cmd.shipment_id,
+            Command::OrderCreate(cmd) => cmd.order_id.to_string(),
+            Command::OrderUpdate(cmd) => cmd.order_id.to_string(),
+            Command::OrderCancel(cmd) => cmd.order_id.to_string(),
+            Command::ShipmentCreate(cmd) => cmd.shipment_id.to_string(),
         }
-    }
-}
-
-impl Id for (OrderState, ShipmentState) {
-    fn id(&self) -> u32 {
-        self.0.order_id
-    }
-}
-
-impl Id for (OrderViewState, ShipmentViewState) {
-    fn id(&self) -> u32 {
-        self.0.order_id
     }
 }
 

@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 
 use crate::decider::{Decider, EventComputation, StateComputation};
 use crate::saga::{ActionComputation, Saga};
+use crate::Identifier;
 
 /// Event Repository trait
 ///
@@ -316,7 +317,11 @@ where
         }
     }
     /// Handles the command by fetching the events from the repository, computing new events based on the current events and the command, and saving the new events to the repository.
-    pub async fn handle(&self, command: &C) -> Result<Vec<(E, Version)>, Error> {
+    pub async fn handle(&self, command: &C) -> Result<Vec<(E, Version)>, Error>
+    where
+        E: Identifier,
+        C: Identifier,
+    {
         let events: Vec<(E, Version)> = self.fetch_events(command).await?;
         let mut current_events: Vec<E> = vec![];
         for (event, _) in events {
@@ -336,7 +341,11 @@ where
         &self,
         current_events: &[E],
         command: &C,
-    ) -> Result<Vec<E>, Error> {
+    ) -> Result<Vec<E>, Error>
+    where
+        E: Identifier,
+        C: Identifier,
+    {
         let current_state: S = current_events
             .iter()
             .fold((self.decider.initial_state)(), |state, event| {
@@ -361,7 +370,11 @@ where
                     .iter()
                     .map(|(e, _)| e.clone())
                     .collect::<Vec<E>>(),
-                initial_events.clone(),
+                initial_events
+                    .clone()
+                    .into_iter()
+                    .filter(|e| e.identifier() == command.identifier())
+                    .collect::<Vec<E>>(),
             ]
             .concat();
 

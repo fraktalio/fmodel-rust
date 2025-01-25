@@ -340,3 +340,10 @@ pub enum Sum<A, B> {
     /// Second variant
     Second(B),
 }
+
+/// Identify the state/command/event.
+/// It is used to identify the concept to what the state/command/event belongs to. For example, the `order_id` or `restaurant_id`.
+pub trait Identifier {
+    /// Returns the identifier of the state/command/event
+    fn identifier(&self) -> String;
+}
