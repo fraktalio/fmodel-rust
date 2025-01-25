@@ -22,6 +22,15 @@ pub struct OrderViewState {
     pub is_cancelled: bool,
 }
 
+/// A second version of the ViewOrder entity / It represents the Query Model
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrderView2State {
+    pub order_id: u32,
+    pub customer_name: String,
+    pub items: Vec<String>,
+    pub is_cancelled: bool,
+}
+
 /// All variants of Order commands
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
