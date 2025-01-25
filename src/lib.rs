@@ -347,3 +347,16 @@ pub trait Identifier {
     /// Returns the identifier of the state/command/event
     fn identifier(&self) -> String;
 }
+
+impl<A, B> Identifier for Sum<A, B>
+where
+    A: Identifier,
+    B: Identifier,
+{
+    fn identifier(&self) -> String {
+        match self {
+            Sum::First(a) => a.identifier(),
+            Sum::Second(b) => b.identifier(),
+        }
+    }
+}
