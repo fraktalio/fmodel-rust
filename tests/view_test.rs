@@ -1,3 +1,4 @@
+use api::OrderView2State;
 use fmodel_rust::view::{View, ViewStateComputation};
 
 use crate::api::{
@@ -61,14 +62,45 @@ fn shipment_view<'a>() -> View<'a, ShipmentViewState, ShipmentEvent> {
     }
 }
 
+fn order_view_second<'a>() -> View<'a, OrderView2State, OrderEvent> {
+    View {
+        evolve: Box::new(|state, event| {
+            let mut new_state = state.clone();
+            match event {
+                OrderEvent::Created(evt) => {
+                    new_state.order_id = evt.order_id;
+                    new_state.customer_name = evt.customer_name.to_owned();
+                    new_state.items = evt.items.to_owned();
+                }
+                OrderEvent::Updated(evt) => {
+                    new_state.items = evt.updated_items.to_owned();
+                }
+                OrderEvent::Cancelled(_) => {
+                    new_state.is_cancelled = true;
+                }
+            }
+            new_state
+        }),
+        initial_state: Box::new(|| OrderView2State {
+            order_id: 0,
+            customer_name: "".to_string(),
+            items: Vec::new(),
+            is_cancelled: false,
+        }),
+    }
+}
+
 #[test]
 fn test() {
     let order_view: View<OrderViewState, OrderEvent> = order_view();
     let order_view2: View<OrderViewState, OrderEvent> = crate::order_view();
+    let order_view3: View<OrderViewState, OrderEvent> = crate::order_view();
+    let order_view_second: View<OrderView2State, OrderEvent> = order_view_second();
     let shipment_view: View<ShipmentViewState, ShipmentEvent> = shipment_view();
     let combined_view = order_view2
         .combine(shipment_view)
         .map_event(&event_from_sum);
+    let merged_view = order_view3.merge(order_view_second);
 
     let order_created_event = OrderEvent::Created(OrderCreatedEvent {
         order_id: 1,
@@ -91,6 +123,7 @@ fn test() {
         customer_name: "John Doe".to_string(),
         items: vec!["Item 1".to_string(), "Item 2".to_string()],
     });
+
     let new_combined_state2 = combined_view.compute_new_state(None, &[&order_created_event2]);
     assert_eq!(
         new_combined_state2,
@@ -106,6 +139,25 @@ fn test() {
                 order_id: 0,
                 customer_name: "".to_string(),
                 items: Vec::new(),
+            }
+        )
+    );
+
+    let new_combined_state_2 = merged_view.compute_new_state(None, &[&order_created_event]);
+    assert_eq!(
+        new_combined_state_2,
+        (
+            OrderViewState {
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                is_cancelled: false,
+            },
+            OrderView2State {
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 1".to_string(), "Item 2".to_string()],
+                is_cancelled: false,
             }
         )
     );
