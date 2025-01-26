@@ -131,6 +131,25 @@ impl<'a, AR, A> Saga<'a, AR, A> {
 
         Saga { react: new_react }
     }
+
+    /// Merges two sagas into one.
+    /// Creates a new instance of a Saga by merging two sagas of type `AR`, `A` and `AR`, `A2` into a new saga of type `AR`, `Sum<A, A2>`
+    pub fn merge<A2>(self, saga2: Saga<'a, AR, A2>) -> Saga<'a, AR, Sum<A2, A>> {
+        let new_react = Box::new(move |ar: &AR| {
+            let a: Vec<Sum<A2, A>> = (self.react)(ar)
+                .into_iter()
+                .map(|a: A| Sum::Second(a))
+                .collect();
+            let a2: Vec<Sum<A2, A>> = (saga2.react)(ar)
+                .into_iter()
+                .map(|a2: A2| Sum::First(a2))
+                .collect();
+
+            a.into_iter().chain(a2).collect()
+        });
+
+        Saga { react: new_react }
+    }
 }
 
 /// Formalizes the `Action Computation` algorithm for the `saga` to handle events/action_results, and produce new commands/actions.
