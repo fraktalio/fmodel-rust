@@ -1,4 +1,7 @@
-use crate::{DecideFunction, EvolveFunction, InitialStateFunction, Sum};
+use crate::{
+    DecideFunction, Decider3, Decider4, Decider5, Decider6, EvolveFunction, InitialStateFunction,
+    Sum, Sum3, Sum4, Sum5, Sum6,
+};
 
 /// [Decider] represents the main decision-making algorithm.
 /// It has three generic parameters `C`/`Command`, `S`/`State`, `E`/`Event` , representing the type of the values that Decider may contain or use.
@@ -308,6 +311,284 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
             evolve: new_evolve,
             initial_state: new_initial_state,
         }
+    }
+
+    /// Combines three deciders into one bigger decider
+    pub fn combine3<C2, S2, E2, C3, S3, E3>(
+        self,
+        decider2: Decider<'a, C2, S2, E2, Error>,
+        decider3: Decider<'a, C3, S3, E3, Error>,
+    ) -> Decider3<'a, C, C2, C3, S, S2, S3, E, E2, E3, Error>
+    where
+        S: Clone,
+        S2: Clone,
+        S3: Clone,
+        E: Clone,
+        E2: Clone,
+        E3: Clone,
+        C: Clone,
+        C2: Clone,
+        C3: Clone,
+    {
+        // First combine self with decider2
+        let combined = self.combine(decider2);
+
+        // Then combine with decider3 and map the types
+        combined
+            .combine(decider3)
+            .map_state(
+                &|s: &(S, S2, S3)| ((s.0.clone(), s.1.clone()), s.2.clone()),
+                &|s: &((S, S2), S3)| (s.0 .0.clone(), s.0 .1.clone(), s.1.clone()),
+            )
+            .map_event(
+                &|e: &Sum3<E, E2, E3>| match e {
+                    Sum3::First(ref e) => Sum::First(Sum::First(e.clone())),
+                    Sum3::Second(ref e) => Sum::First(Sum::Second(e.clone())),
+                    Sum3::Third(ref e) => Sum::Second(e.clone()),
+                },
+                &|e| match e {
+                    Sum::First(Sum::First(e)) => Sum3::First(e.clone()),
+                    Sum::First(Sum::Second(e)) => Sum3::Second(e.clone()),
+                    Sum::Second(e) => Sum3::Third(e.clone()),
+                },
+            )
+            .map_command(&|c: &Sum3<C, C2, C3>| match c {
+                Sum3::First(c) => Sum::First(Sum::First(c.clone())),
+                Sum3::Second(c) => Sum::First(Sum::Second(c.clone())),
+                Sum3::Third(c) => Sum::Second(c.clone()),
+            })
+    }
+
+    #[allow(clippy::type_complexity)]
+    /// Combines four deciders into one bigger decider
+    pub fn combine4<C2, S2, E2, C3, S3, E3, C4, S4, E4>(
+        self,
+        decider2: Decider<'a, C2, S2, E2, Error>,
+        decider3: Decider<'a, C3, S3, E3, Error>,
+        decider4: Decider<'a, C4, S4, E4, Error>,
+    ) -> Decider4<'a, C, C2, C3, C4, S, S2, S3, S4, E, E2, E3, E4, Error>
+    where
+        S: Clone,
+        S2: Clone,
+        S3: Clone,
+        S4: Clone,
+        E: Clone,
+        E2: Clone,
+        E3: Clone,
+        E4: Clone,
+        C: Clone,
+        C2: Clone,
+        C3: Clone,
+        C4: Clone,
+    {
+        let combined = self
+            .combine(decider2)
+            .combine(decider3)
+            .combine(decider4)
+            .map_state(
+                &|s: &(S, S2, S3, S4)| (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
+                &|s: &(((S, S2), S3), S4)| {
+                    (
+                        s.0 .0 .0.clone(),
+                        s.0 .0 .1.clone(),
+                        s.0 .1.clone(),
+                        s.1.clone(),
+                    )
+                },
+            )
+            .map_event(
+                &|e: &Sum4<E, E2, E3, E4>| match e {
+                    Sum4::First(e) => Sum::First(Sum::First(Sum::First(e.clone()))),
+                    Sum4::Second(e) => Sum::First(Sum::First(Sum::Second(e.clone()))),
+                    Sum4::Third(e) => Sum::First(Sum::Second(e.clone())),
+                    Sum4::Fourth(e) => Sum::Second(e.clone()),
+                },
+                &|e| match e {
+                    Sum::First(Sum::First(Sum::First(e))) => Sum4::First(e.clone()),
+                    Sum::First(Sum::First(Sum::Second(e))) => Sum4::Second(e.clone()),
+                    Sum::First(Sum::Second(e)) => Sum4::Third(e.clone()),
+                    Sum::Second(e) => Sum4::Fourth(e.clone()),
+                },
+            )
+            .map_command(&|c: &Sum4<C, C2, C3, C4>| match c {
+                Sum4::First(c) => Sum::First(Sum::First(Sum::First(c.clone()))),
+                Sum4::Second(c) => Sum::First(Sum::First(Sum::Second(c.clone()))),
+                Sum4::Third(c) => Sum::First(Sum::Second(c.clone())),
+                Sum4::Fourth(c) => Sum::Second(c.clone()),
+            });
+        combined
+    }
+
+    #[allow(clippy::type_complexity)]
+    /// Combines five deciders into one bigger decider
+    pub fn combine5<C2, S2, E2, C3, S3, E3, C4, S4, E4, C5, S5, E5>(
+        self,
+        decider2: Decider<'a, C2, S2, E2, Error>,
+        decider3: Decider<'a, C3, S3, E3, Error>,
+        decider4: Decider<'a, C4, S4, E4, Error>,
+        decider5: Decider<'a, C5, S5, E5, Error>,
+    ) -> Decider5<'a, C, C2, C3, C4, C5, S, S2, S3, S4, S5, E, E2, E3, E4, E5, Error>
+    where
+        S: Clone,
+        S2: Clone,
+        S3: Clone,
+        S4: Clone,
+        S5: Clone,
+        E: Clone,
+        E2: Clone,
+        E3: Clone,
+        E4: Clone,
+        E5: Clone,
+        C: Clone,
+        C2: Clone,
+        C3: Clone,
+        C4: Clone,
+        C5: Clone,
+    {
+        let combined = self
+            .combine(decider2)
+            .combine(decider3)
+            .combine(decider4)
+            .combine(decider5)
+            .map_state(
+                &|s: &(S, S2, S3, S4, S5)| {
+                    (
+                        (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
+                        s.4.clone(),
+                    )
+                },
+                &|s: &((((S, S2), S3), S4), S5)| {
+                    (
+                        s.0 .0 .0 .0.clone(),
+                        s.0 .0 .0 .1.clone(),
+                        s.0 .0 .1.clone(),
+                        s.0 .1.clone(),
+                        s.1.clone(),
+                    )
+                },
+            )
+            .map_event(
+                &|e: &Sum5<E, E2, E3, E4, E5>| match e {
+                    Sum5::First(e) => Sum::First(Sum::First(Sum::First(Sum::First(e.clone())))),
+                    Sum5::Second(e) => Sum::First(Sum::First(Sum::First(Sum::Second(e.clone())))),
+                    Sum5::Third(e) => Sum::First(Sum::First(Sum::Second(e.clone()))),
+                    Sum5::Fourth(e) => Sum::First(Sum::Second(e.clone())),
+                    Sum5::Fifth(e) => Sum::Second(e.clone()),
+                },
+                &|e| match e {
+                    Sum::First(Sum::First(Sum::First(Sum::First(e)))) => Sum5::First(e.clone()),
+                    Sum::First(Sum::First(Sum::First(Sum::Second(e)))) => Sum5::Second(e.clone()),
+                    Sum::First(Sum::First(Sum::Second(e))) => Sum5::Third(e.clone()),
+                    Sum::First(Sum::Second(e)) => Sum5::Fourth(e.clone()),
+                    Sum::Second(e) => Sum5::Fifth(e.clone()),
+                },
+            )
+            .map_command(&|c: &Sum5<C, C2, C3, C4, C5>| match c {
+                Sum5::First(c) => Sum::First(Sum::First(Sum::First(Sum::First(c.clone())))),
+                Sum5::Second(c) => Sum::First(Sum::First(Sum::First(Sum::Second(c.clone())))),
+                Sum5::Third(c) => Sum::First(Sum::First(Sum::Second(c.clone()))),
+                Sum5::Fourth(c) => Sum::First(Sum::Second(c.clone())),
+                Sum5::Fifth(c) => Sum::Second(c.clone()),
+            });
+        combined
+    }
+
+    #[allow(clippy::type_complexity)]
+    /// Combines six deciders into one bigger decider
+    pub fn combine6<C2, S2, E2, C3, S3, E3, C4, S4, E4, C5, S5, E5, C6, S6, E6>(
+        self,
+        decider2: Decider<'a, C2, S2, E2, Error>,
+        decider3: Decider<'a, C3, S3, E3, Error>,
+        decider4: Decider<'a, C4, S4, E4, Error>,
+        decider5: Decider<'a, C5, S5, E5, Error>,
+        decider6: Decider<'a, C6, S6, E6, Error>,
+    ) -> Decider6<'a, C, C2, C3, C4, C5, C6, S, S2, S3, S4, S5, S6, E, E2, E3, E4, E5, E6, Error>
+    where
+        S: Clone,
+        S2: Clone,
+        S3: Clone,
+        S4: Clone,
+        S5: Clone,
+        S6: Clone,
+        E: Clone,
+        E2: Clone,
+        E3: Clone,
+        E4: Clone,
+        E5: Clone,
+        E6: Clone,
+        C: Clone,
+        C2: Clone,
+        C3: Clone,
+        C4: Clone,
+        C5: Clone,
+        C6: Clone,
+    {
+        let combined = self
+            .combine(decider2)
+            .combine(decider3)
+            .combine(decider4)
+            .combine(decider5)
+            .combine(decider6)
+            .map_state(
+                &|s: &(S, S2, S3, S4, S5, S6)| {
+                    (
+                        (
+                            (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
+                            s.4.clone(),
+                        ),
+                        s.5.clone(),
+                    )
+                },
+                &|s: &(((((S, S2), S3), S4), S5), S6)| {
+                    (
+                        s.0 .0 .0 .0 .0.clone(),
+                        s.0 .0 .0 .0 .1.clone(),
+                        s.0 .0 .0 .1.clone(),
+                        s.0 .0 .1.clone(),
+                        s.0 .1.clone(),
+                        s.1.clone(),
+                    )
+                },
+            )
+            .map_event(
+                &|e: &Sum6<E, E2, E3, E4, E5, E6>| match e {
+                    Sum6::First(e) => {
+                        Sum::First(Sum::First(Sum::First(Sum::First(Sum::First(e.clone())))))
+                    }
+                    Sum6::Second(e) => {
+                        Sum::First(Sum::First(Sum::First(Sum::First(Sum::Second(e.clone())))))
+                    }
+                    Sum6::Third(e) => Sum::First(Sum::First(Sum::First(Sum::Second(e.clone())))),
+                    Sum6::Fourth(e) => Sum::First(Sum::First(Sum::Second(e.clone()))),
+                    Sum6::Fifth(e) => Sum::First(Sum::Second(e.clone())),
+                    Sum6::Sixth(e) => Sum::Second(e.clone()),
+                },
+                &|e| match e {
+                    Sum::First(Sum::First(Sum::First(Sum::First(Sum::First(e))))) => {
+                        Sum6::First(e.clone())
+                    }
+                    Sum::First(Sum::First(Sum::First(Sum::First(Sum::Second(e))))) => {
+                        Sum6::Second(e.clone())
+                    }
+                    Sum::First(Sum::First(Sum::First(Sum::Second(e)))) => Sum6::Third(e.clone()),
+                    Sum::First(Sum::First(Sum::Second(e))) => Sum6::Fourth(e.clone()),
+                    Sum::First(Sum::Second(e)) => Sum6::Fifth(e.clone()),
+                    Sum::Second(e) => Sum6::Sixth(e.clone()),
+                },
+            )
+            .map_command(&|c: &Sum6<C, C2, C3, C4, C5, C6>| match c {
+                Sum6::First(c) => {
+                    Sum::First(Sum::First(Sum::First(Sum::First(Sum::First(c.clone())))))
+                }
+                Sum6::Second(c) => {
+                    Sum::First(Sum::First(Sum::First(Sum::First(Sum::Second(c.clone())))))
+                }
+                Sum6::Third(c) => Sum::First(Sum::First(Sum::First(Sum::Second(c.clone())))),
+                Sum6::Fourth(c) => Sum::First(Sum::First(Sum::Second(c.clone()))),
+                Sum6::Fifth(c) => Sum::First(Sum::Second(c.clone())),
+                Sum6::Sixth(c) => Sum::Second(c.clone()),
+            });
+        combined
     }
 }
 

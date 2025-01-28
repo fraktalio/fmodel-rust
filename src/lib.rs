@@ -307,7 +307,10 @@
 //! ---
 //! Created with `love` by [Fraktalio](https://!fraktalio.com/)
 
+use decider::Decider;
+use saga::Saga;
 use serde::{Deserialize, Serialize};
+use view::View;
 
 /// Aggregate module - belongs to the `Application` layer - composes pure logic and effects (fetching, storing)
 pub mod aggregate;
@@ -332,7 +335,7 @@ pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a + Send + Sync>;
 /// The [ReactFunction] function is used to decide what actions/A to execute next based on the action result/AR.
 pub type ReactFunction<'a, AR, A> = Box<dyn Fn(&AR) -> Vec<A> + 'a + Send + Sync>;
 
-/// Define the generic Combined/Sum Enum
+/// Generic Combined/Sum Enum of two variants
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Sum<A, B> {
     /// First variant
@@ -340,6 +343,108 @@ pub enum Sum<A, B> {
     /// Second variant
     Second(B),
 }
+
+/// Generic Combined/Sum Enum of three variants
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum Sum3<A, B, C> {
+    /// First variant
+    First(A),
+    /// Second variant
+    Second(B),
+    /// Third variant
+    Third(C),
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+/// Generic Combined/Sum Enum of four variants
+pub enum Sum4<A, B, C, D> {
+    /// First variant
+    First(A),
+    /// Second variant
+    Second(B),
+    /// Third variant
+    Third(C),
+    /// Fourth variant
+    Fourth(D),
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+/// Generic Combined/Sum Enum of five variants
+pub enum Sum5<A, B, C, D, E> {
+    /// First variant
+    First(A),
+    /// Second variant
+    Second(B),
+    /// Third variant
+    Third(C),
+    /// Fourth variant
+    Fourth(D),
+    /// Fifth variant
+    Fifth(E),
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+/// Generic Combined/Sum Enum of six variants
+pub enum Sum6<A, B, C, D, E, F> {
+    /// First variant
+    First(A),
+    /// Second variant
+    Second(B),
+    /// Third variant
+    Third(C),
+    /// Fourth variant
+    Fourth(D),
+    /// Fifth variant
+    Fifth(E),
+    /// Sixth variant
+    Sixth(F),
+}
+
+/// Convenient type alias that represents 3 combined Deciders
+type Decider3<'a, C1, C2, C3, S1, S2, S3, E1, E2, E3, Error> =
+    Decider<'a, Sum3<C1, C2, C3>, (S1, S2, S3), Sum3<E1, E2, E3>, Error>;
+
+/// Convenient type alias that represents 4 combined Deciders
+type Decider4<'a, C1, C2, C3, C4, S1, S2, S3, S4, E1, E2, E3, E4, Error> =
+    Decider<'a, Sum4<C1, C2, C3, C4>, (S1, S2, S3, S4), Sum4<E1, E2, E3, E4>, Error>;
+
+/// Convenient type alias that represents 5 combined Deciders
+type Decider5<'a, C1, C2, C3, C4, C5, S1, S2, S3, S4, S5, E1, E2, E3, E4, E5, Error> =
+    Decider<'a, Sum5<C1, C2, C3, C4, C5>, (S1, S2, S3, S4, S5), Sum5<E1, E2, E3, E4, E5>, Error>;
+
+/// Convenient type alias that represents 6 combined Deciders
+type Decider6<'a, C1, C2, C3, C4, C5, C6, S1, S2, S3, S4, S5, S6, E1, E2, E3, E4, E5, E6, Error> =
+    Decider<
+        'a,
+        Sum6<C1, C2, C3, C4, C5, C6>,
+        (S1, S2, S3, S4, S5, S6),
+        Sum6<E1, E2, E3, E4, E5, E6>,
+        Error,
+    >;
+
+/// Convenient type alias that represents 3 merged Views
+type View3<'a, S1, S2, S3, E> = View<'a, (S1, S2, S3), E>;
+
+/// Convenient type alias that represents 4 merged Deciders
+type View4<'a, S1, S2, S3, S4, E> = View<'a, (S1, S2, S3, S4), E>;
+
+/// Convenient type alias that represents 5 merged Deciders
+type View5<'a, S1, S2, S3, S4, S5, E> = View<'a, (S1, S2, S3, S4, S5), E>;
+
+/// Convenient type alias that represents 6 merged Deciders
+type View6<'a, S1, S2, S3, S4, S5, S6, E> = View<'a, (S1, S2, S3, S4, S5, S6), E>;
+
+/// Convenient type alias that represents 3 merged Sagas
+type Saga3<'a, AR, A1, A2, A3> = Saga<'a, AR, Sum3<A1, A2, A3>>;
+
+/// Convenient type alias that represents 4 merged Sagas
+type Saga4<'a, AR, A1, A2, A3, A4> = Saga<'a, AR, Sum4<A1, A2, A3, A4>>;
+
+/// Convenient type alias that represents 5 merged Sagas
+type Saga5<'a, AR, A1, A2, A3, A4, A5> = Saga<'a, AR, Sum5<A1, A2, A3, A4, A5>>;
+
+/// Convenient type alias that represents 6 merged Sagas
+type Saga6<'a, AR, A1, A2, A3, A4, A5, A6> = Saga<'a, AR, Sum6<A1, A2, A3, A4, A5, A6>>;
 
 /// Identify the state/command/event.
 /// It is used to identify the concept to what the state/command/event belongs to. For example, the `order_id` or `restaurant_id`.
