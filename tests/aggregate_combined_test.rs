@@ -211,10 +211,10 @@ fn shipment_decider<'a>() -> Decider<'a, ShipmentCommand, ShipmentState, Shipmen
     }
 }
 
-fn order_saga<'a>() -> Saga<'a, OrderEvent, ShipmentCommand> {
+fn order_saga<'a>() -> Saga<'a, Event, ShipmentCommand> {
     Saga {
         react: Box::new(|event| match event {
-            OrderEvent::Created(evt) => {
+            Event::OrderCreated(evt) => {
                 vec![ShipmentCommand::Create(CreateShipmentCommand {
                     shipment_id: evt.order_id,
                     order_id: evt.order_id,
@@ -222,24 +222,37 @@ fn order_saga<'a>() -> Saga<'a, OrderEvent, ShipmentCommand> {
                     items: evt.items.to_owned(),
                 })]
             }
-            OrderEvent::Updated(_) => {
+            Event::OrderUpdated(_) => {
                 vec![]
             }
-            OrderEvent::Cancelled(_) => {
+            Event::OrderCancelled(_) => {
+                vec![]
+            }
+            Event::ShipmentCreated(_) => {
                 vec![]
             }
         }),
     }
 }
 
-fn shipment_saga<'a>() -> Saga<'a, ShipmentEvent, OrderCommand> {
+fn shipment_saga<'a>() -> Saga<'a, Event, OrderCommand> {
     Saga {
         react: Box::new(|event| match event {
-            ShipmentEvent::Created(evt) => {
-                vec![OrderCommand::Update(api::UpdateOrderCommand {
+            Event::ShipmentCreated(evt) => {
+                vec![OrderCommand::Update(UpdateOrderCommand {
                     order_id: evt.order_id,
                     new_items: evt.items.to_owned(),
                 })]
+            }
+
+            Event::OrderCreated(_) => {
+                vec![]
+            }
+            Event::OrderUpdated(_) => {
+                vec![]
+            }
+            Event::OrderCancelled(_) => {
+                vec![]
             }
         }),
     }
@@ -367,9 +380,8 @@ async fn orchestrated_event_sourced_aggregate_test() {
         .map_command(&command_from_sum) // Decider<Command, (OrderState, ShipmentState), Sum<OrderEvent, ShipmentEvent>>
         .map_event(&event_from_sum, &sum_to_event); // Decider<Command, (OrderState, ShipmentState), Event>
     let combined_saga = order_saga()
-        .combine(shipment_saga())
-        .map_action(&sum_to_command)
-        .map_action_result(&event_from_sum);
+        .merge(shipment_saga())
+        .map_action(&sum_to_command);
     let repository = InMemoryEventRepository::new();
     let aggregate = Arc::new(EventSourcedOrchestratingAggregate::new(
         repository,
@@ -700,9 +712,8 @@ async fn state_stored_combined_test() {
         .map_event(&event_from_sum, &sum_to_event); // Decider<Command, (OrderState, ShipmentState), Event>
 
     let combined_saga = order_saga()
-        .combine(shipment_saga())
-        .map_action(&sum_to_command)
-        .map_action_result(&event_from_sum);
+        .merge(shipment_saga())
+        .map_action(&sum_to_command);
 
     let repository = InMemoryStateRepository::new();
     let aggregate = Arc::new(StateStoredOrchestratingAggregate::new(

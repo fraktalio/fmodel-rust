@@ -128,6 +128,10 @@ impl<'a, S, E> View<'a, S, E> {
     /// Combines two views into one.
     /// Creates a new instance of a View by combining two views of type `S`, `E` and `S2`, `E2` into a new view of type `(S, S2)`, `Sum<E, E2>`
     /// Combines two views that operate on different event types (`E`` and `E2``) into a new view operating on `Sum<E, E2>`
+    #[deprecated(
+        since = "0.8.0",
+        note = "Use the `merge` function instead. This ensures all your views can subscribe to all `Event`/`E` in the system."
+    )]
     pub fn combine<S2, E2>(self, view2: View<'a, S2, E2>) -> View<'a, (S, S2), Sum<E, E2>>
     where
         S: Clone,
@@ -161,7 +165,7 @@ impl<'a, S, E> View<'a, S, E> {
     /// Merges two views into one.
     /// Creates a new instance of a View by merging two views of type `S`, `E` and `S2`, `E` into a new view of type `(S, S2)`, `E`
     /// Similar to `combine`, but the event type is the same for both views.
-    /// Composes two views that operate on the same/shared event type (`E`) into a new view operating on `E`
+    /// This ensures all your views can subscribe to all `Event`/`E` in the system.
     pub fn merge<S2>(self, view2: View<'a, S2, E>) -> View<'a, (S, S2), E>
     where
         S: Clone,

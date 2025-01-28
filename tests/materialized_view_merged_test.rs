@@ -7,30 +7,30 @@ use fmodel_rust::view::View;
 use fmodel_rust::Identifier;
 
 use crate::api::{
-    OrderCancelledEvent, OrderCreatedEvent, OrderEvent, OrderUpdatedEvent, OrderViewState,
-    ShipmentEvent, ShipmentViewState,
+    OrderCancelledEvent, OrderCreatedEvent, OrderUpdatedEvent, OrderViewState, ShipmentViewState,
 };
-use crate::application::{event_from_sum, Event, MaterializedViewError};
+use crate::application::{Event, MaterializedViewError};
 
 mod api;
 mod application;
 
-fn order_view<'a>() -> View<'a, OrderViewState, OrderEvent> {
+fn order_view<'a>() -> View<'a, OrderViewState, Event> {
     View {
         evolve: Box::new(|state, event| {
             let mut new_state = state.clone();
             match event {
-                OrderEvent::Created(evt) => {
+                Event::OrderCreated(evt) => {
                     new_state.order_id = evt.order_id;
                     new_state.customer_name = evt.customer_name.to_owned();
                     new_state.items = evt.items.to_owned();
                 }
-                OrderEvent::Updated(evt) => {
+                Event::OrderUpdated(evt) => {
                     new_state.items = evt.updated_items.to_owned();
                 }
-                OrderEvent::Cancelled(_) => {
+                Event::OrderCancelled(_) => {
                     new_state.is_cancelled = true;
                 }
+                Event::ShipmentCreated(_) => {}
             }
             new_state
         }),
@@ -43,17 +43,20 @@ fn order_view<'a>() -> View<'a, OrderViewState, OrderEvent> {
     }
 }
 
-fn shipment_view<'a>() -> View<'a, ShipmentViewState, ShipmentEvent> {
+fn shipment_view<'a>() -> View<'a, ShipmentViewState, Event> {
     View {
         evolve: Box::new(|state, event| {
             let mut new_state = state.clone();
             match event {
-                ShipmentEvent::Created(evt) => {
+                Event::ShipmentCreated(evt) => {
                     new_state.shipment_id = evt.shipment_id;
                     new_state.order_id = evt.order_id;
                     new_state.customer_name = evt.customer_name.to_owned();
                     new_state.items = evt.items.to_owned();
                 }
+                Event::OrderCreated(_) => {}
+                Event::OrderUpdated(_) => {}
+                Event::OrderCancelled(_) => {}
             }
             new_state
         }),
@@ -108,9 +111,7 @@ impl ViewStateRepository<Event, (OrderViewState, ShipmentViewState), Materialize
 
 #[tokio::test]
 async fn test() {
-    let combined_view = order_view()
-        .combine(shipment_view())
-        .map_event(&event_from_sum);
+    let combined_view = order_view().merge(shipment_view());
     let repository = InMemoryViewStateRepository::new();
     let materialized_view = Arc::new(MaterializedView::new(repository, combined_view));
     let materialized_view1 = Arc::clone(&materialized_view);
