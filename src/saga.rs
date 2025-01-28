@@ -117,6 +117,10 @@ impl<'a, AR, A> Saga<'a, AR, A> {
 
     /// Combines two sagas into one.
     /// Creates a new instance of a Saga by combining two sagas of type `AR`, `A` and `AR2`, `A2` into a new saga of type `Sum<AR, AR2>`, `Sum<A2, A>`
+    #[deprecated(
+        since = "0.8.0",
+        note = "Use the `merge` function instead. This ensures all your sagas can subscribe to all `Event`/`E` in the system."
+    )]
     pub fn combine<AR2, A2>(self, saga2: Saga<'a, AR2, A2>) -> Saga<'a, Sum<AR, AR2>, Sum<A2, A>> {
         let new_react = Box::new(move |ar: &Sum<AR, AR2>| match ar {
             Sum::First(ar) => {
@@ -134,6 +138,8 @@ impl<'a, AR, A> Saga<'a, AR, A> {
 
     /// Merges two sagas into one.
     /// Creates a new instance of a Saga by merging two sagas of type `AR`, `A` and `AR`, `A2` into a new saga of type `AR`, `Sum<A, A2>`
+    /// Similar to `combine`, but the event type is the same for both sagas.
+    /// This ensures all your sagas can subscribe to all `Event`/`E` in the system.
     pub fn merge<A2>(self, saga2: Saga<'a, AR, A2>) -> Saga<'a, AR, Sum<A2, A>> {
         let new_react = Box::new(move |ar: &AR| {
             let a: Vec<Sum<A2, A>> = (self.react)(ar)
