@@ -1,4 +1,4 @@
-use crate::{ReactFunction, Sum};
+use crate::{ReactFunction, Saga3, Saga4, Saga5, Saga6, Sum, Sum3, Sum4, Sum5, Sum6};
 
 /// [Saga] is a datatype that represents the central point of control, deciding what to execute next (`A`), based on the action result (`AR`).
 /// It has two generic parameters `AR`/Action Result, `A`/Action , representing the type of the values that Saga may contain or use.
@@ -155,6 +155,118 @@ impl<'a, AR, A> Saga<'a, AR, A> {
         });
 
         Saga { react: new_react }
+    }
+
+    /// Merges three sagas into one.
+    pub fn merge3<A2, A3>(
+        self,
+        saga2: Saga<'a, AR, A2>,
+        saga3: Saga<'a, AR, A3>,
+    ) -> Saga3<'a, AR, A, A2, A3>
+    where
+        A: Clone,
+        A2: Clone,
+        A3: Clone,
+    {
+        self.merge(saga2)
+            .merge(saga3)
+            .map_action(&|a: &Sum<A3, Sum<A2, A>>| match a {
+                Sum::First(a) => Sum3::Third(a.clone()),
+                Sum::Second(Sum::First(a)) => Sum3::Second(a.clone()),
+                Sum::Second(Sum::Second(a)) => Sum3::First(a.clone()),
+            })
+    }
+
+    /// Merges four sagas into one.
+    pub fn merge4<A2, A3, A4>(
+        self,
+        saga2: Saga<'a, AR, A2>,
+        saga3: Saga<'a, AR, A3>,
+        saga4: Saga<'a, AR, A4>,
+    ) -> Saga4<'a, AR, A, A2, A3, A4>
+    where
+        A: Clone,
+        A2: Clone,
+        A3: Clone,
+        A4: Clone,
+    {
+        self.merge(saga2)
+            .merge(saga3)
+            .merge(saga4)
+            .map_action(&|a: &Sum<A4, Sum<A3, Sum<A2, A>>>| match a {
+                Sum::First(a) => Sum4::Fourth(a.clone()),
+                Sum::Second(Sum::First(a)) => Sum4::Third(a.clone()),
+                Sum::Second(Sum::Second(Sum::First(a))) => Sum4::Second(a.clone()),
+                Sum::Second(Sum::Second(Sum::Second(a))) => Sum4::First(a.clone()),
+            })
+    }
+
+    #[allow(clippy::type_complexity)]
+    /// Merges five sagas into one.
+    pub fn merge5<A2, A3, A4, A5>(
+        self,
+        saga2: Saga<'a, AR, A2>,
+        saga3: Saga<'a, AR, A3>,
+        saga4: Saga<'a, AR, A4>,
+        saga5: Saga<'a, AR, A5>,
+    ) -> Saga5<'a, AR, A, A2, A3, A4, A5>
+    where
+        A: Clone,
+        A2: Clone,
+        A3: Clone,
+        A4: Clone,
+        A5: Clone,
+    {
+        self.merge(saga2)
+            .merge(saga3)
+            .merge(saga4)
+            .merge(saga5)
+            .map_action(&|a: &Sum<A5, Sum<A4, Sum<A3, Sum<A2, A>>>>| match a {
+                Sum::First(a) => Sum5::Fifth(a.clone()),
+                Sum::Second(Sum::First(a)) => Sum5::Fourth(a.clone()),
+                Sum::Second(Sum::Second(Sum::First(a))) => Sum5::Third(a.clone()),
+                Sum::Second(Sum::Second(Sum::Second(Sum::First(a)))) => Sum5::Second(a.clone()),
+                Sum::Second(Sum::Second(Sum::Second(Sum::Second(a)))) => Sum5::First(a.clone()),
+            })
+    }
+
+    #[allow(clippy::type_complexity)]
+    /// Merges six sagas into one.
+    pub fn merge6<A2, A3, A4, A5, A6>(
+        self,
+        saga2: Saga<'a, AR, A2>,
+        saga3: Saga<'a, AR, A3>,
+        saga4: Saga<'a, AR, A4>,
+        saga5: Saga<'a, AR, A5>,
+        saga6: Saga<'a, AR, A6>,
+    ) -> Saga6<'a, AR, A, A2, A3, A4, A5, A6>
+    where
+        A: Clone,
+        A2: Clone,
+        A3: Clone,
+        A4: Clone,
+        A5: Clone,
+        A6: Clone,
+    {
+        self.merge(saga2)
+            .merge(saga3)
+            .merge(saga4)
+            .merge(saga5)
+            .merge(saga6)
+            .map_action(
+                &|a: &Sum<A6, Sum<A5, Sum<A4, Sum<A3, Sum<A2, A>>>>>| match a {
+                    Sum::First(a) => Sum6::Sixth(a.clone()),
+                    Sum::Second(Sum::First(a)) => Sum6::Fifth(a.clone()),
+                    Sum::Second(Sum::Second(Sum::First(a))) => Sum6::Fourth(a.clone()),
+                    Sum::Second(Sum::Second(Sum::Second(Sum::First(a)))) => Sum6::Third(a.clone()),
+                    Sum::Second(Sum::Second(Sum::Second(Sum::Second(Sum::First(a))))) => {
+                        Sum6::Second(a.clone())
+                    }
+                    Sum::Second(Sum::Second(Sum::Second(Sum::Second(Sum::Second(a))))) => {
+                        Sum6::First(a.clone())
+                    }
+                },
+            )
     }
 }
 

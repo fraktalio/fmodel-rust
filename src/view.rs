@@ -1,4 +1,4 @@
-use crate::{EvolveFunction, InitialStateFunction, Sum};
+use crate::{EvolveFunction, InitialStateFunction, Sum, View3, View4, View5, View6};
 
 /// [View] represents the event handling algorithm, responsible for translating the events into denormalized state, which is more adequate for querying.
 /// It has two generic parameters `S`/State, `E`/Event , representing the type of the values that View may contain or use.
@@ -190,6 +190,134 @@ impl<'a, S, E> View<'a, S, E> {
             evolve: new_evolve,
             initial_state: new_initial_state,
         }
+    }
+
+    /// Merges three views into one.
+    pub fn merge3<S2, S3>(
+        self,
+        view2: View<'a, S2, E>,
+        view3: View<'a, S3, E>,
+    ) -> View3<'a, S, S2, S3, E>
+    where
+        S: Clone,
+        S2: Clone,
+        S3: Clone,
+    {
+        self.merge(view2).merge(view3).map_state(
+            &|s: &(S, S2, S3)| ((s.0.clone(), s.1.clone()), s.2.clone()),
+            &|s: &((S, S2), S3)| (s.0 .0.clone(), s.0 .1.clone(), s.1.clone()),
+        )
+    }
+
+    /// Merges four views into one.
+    pub fn merge4<S2, S3, S4>(
+        self,
+        view2: View<'a, S2, E>,
+        view3: View<'a, S3, E>,
+        view4: View<'a, S4, E>,
+    ) -> View4<'a, S, S2, S3, S4, E>
+    where
+        S: Clone,
+        S2: Clone,
+        S3: Clone,
+        S4: Clone,
+    {
+        self.merge(view2).merge(view3).merge(view4).map_state(
+            &|s: &(S, S2, S3, S4)| (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
+            &|s: &(((S, S2), S3), S4)| {
+                (
+                    s.0 .0 .0.clone(),
+                    s.0 .0 .1.clone(),
+                    s.0 .1.clone(),
+                    s.1.clone(),
+                )
+            },
+        )
+    }
+
+    #[allow(clippy::type_complexity)]
+    /// Merges five views into one.
+    pub fn merge5<S2, S3, S4, S5>(
+        self,
+        view2: View<'a, S2, E>,
+        view3: View<'a, S3, E>,
+        view4: View<'a, S4, E>,
+        view5: View<'a, S5, E>,
+    ) -> View5<'a, S, S2, S3, S4, S5, E>
+    where
+        S: Clone,
+        S2: Clone,
+        S3: Clone,
+        S4: Clone,
+        S5: Clone,
+    {
+        self.merge(view2)
+            .merge(view3)
+            .merge(view4)
+            .merge(view5)
+            .map_state(
+                &|s: &(S, S2, S3, S4, S5)| {
+                    (
+                        (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
+                        s.4.clone(),
+                    )
+                },
+                &|s: &((((S, S2), S3), S4), S5)| {
+                    (
+                        s.0 .0 .0 .0.clone(),
+                        s.0 .0 .0 .1.clone(),
+                        s.0 .0 .1.clone(),
+                        s.0 .1.clone(),
+                        s.1.clone(),
+                    )
+                },
+            )
+    }
+
+    #[allow(clippy::type_complexity)]
+    /// Merges six views into one.
+    pub fn merge6<S2, S3, S4, S5, S6>(
+        self,
+        view2: View<'a, S2, E>,
+        view3: View<'a, S3, E>,
+        view4: View<'a, S4, E>,
+        view5: View<'a, S5, E>,
+        view6: View<'a, S6, E>,
+    ) -> View6<'a, S, S2, S3, S4, S5, S6, E>
+    where
+        S: Clone,
+        S2: Clone,
+        S3: Clone,
+        S4: Clone,
+        S5: Clone,
+        S6: Clone,
+    {
+        self.merge(view2)
+            .merge(view3)
+            .merge(view4)
+            .merge(view5)
+            .merge(view6)
+            .map_state(
+                &|s: &(S, S2, S3, S4, S5, S6)| {
+                    (
+                        (
+                            (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
+                            s.4.clone(),
+                        ),
+                        s.5.clone(),
+                    )
+                },
+                &|s: &(((((S, S2), S3), S4), S5), S6)| {
+                    (
+                        s.0 .0 .0 .0 .0.clone(),
+                        s.0 .0 .0 .0 .1.clone(),
+                        s.0 .0 .0 .1.clone(),
+                        s.0 .0 .1.clone(),
+                        s.0 .1.clone(),
+                        s.1.clone(),
+                    )
+                },
+            )
     }
 }
 
