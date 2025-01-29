@@ -322,6 +322,8 @@ pub mod materialized_view;
 pub mod saga;
 /// Saga Manager module - belongs to the `Application` layer - composes pure saga and effects (publishing)
 pub mod saga_manager;
+/// Given-When-Then Test specificatin domain specific language - unit testing
+pub mod specification;
 /// View module - belongs to the `Domain` layer - pure event handling algorithm
 pub mod view;
 
