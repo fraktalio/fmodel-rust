@@ -104,7 +104,7 @@ behavior. `Decider` behaves the same for `C`=`Int` or `C`=`YourCustomType`, for 
 - `E` - Event
 
 ```rust
-pub type DecideFunction<'a, C, S, E> = Box<dyn Fn(&C, &S) -> Vec<E> + 'a + Send + Sync>;
+pub type DecideFunction<'a, C, S, E, Error> = Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error> + 'a + Send + Sync>;
 pub type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>;
 pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a + Send + Sync>;
 
@@ -268,54 +268,44 @@ Fmodel library offers generic and abstract components to specialize in for your 
  - Decider - data type that represents the main decision-making algorithm.
 
 ```rust
-fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
+fn order_decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
     Decider {
-        // Your decision logic goes here.
         decide: Box::new(|command, state| match command {
-            // Exhaustive pattern matching on the command
-            OrderCommand::Create(create_cmd) => {
-                vec![OrderEvent::Created(OrderCreatedEvent {
-                    order_id: create_cmd.order_id,
-                    customer_name: create_cmd.customer_name.to_owned(),
-                    items: create_cmd.items.to_owned(),
-                })]
-            }
-            OrderCommand::Update(update_cmd) => {
-                // Your validation logic goes here
-                if state.order_id == update_cmd.order_id {
-                    vec![OrderEvent::Updated(OrderUpdatedEvent {
-                        order_id: update_cmd.order_id,
-                        updated_items: update_cmd.new_items.to_owned(),
-                    })]
+            OrderCommand::Create(cmd) => Ok(vec![OrderEvent::Created(OrderCreatedEvent {
+                order_id: cmd.order_id,
+                customer_name: cmd.customer_name.to_owned(),
+                items: cmd.items.to_owned(),
+            })]),
+            OrderCommand::Update(cmd) => {
+                if state.order_id == cmd.order_id {
+                    Ok(vec![OrderEvent::Updated(OrderUpdatedEvent {
+                        order_id: cmd.order_id,
+                        updated_items: cmd.new_items.to_owned(),
+                    })])
                 } else {
-                    // In case of validation failure, return empty list of events or error event
-                    vec![]
+                    Ok(vec![])
                 }
             }
-            OrderCommand::Cancel(cancel_cmd) => {
-                // Your validation logic goes here
-                if state.order_id == cancel_cmd.order_id {
-                    vec![OrderEvent::Cancelled(OrderCancelledEvent {
-                        order_id: cancel_cmd.order_id,
-                    })]
+            OrderCommand::Cancel(cmd) => {
+                if state.order_id == cmd.order_id {
+                    Ok(vec![OrderEvent::Cancelled(OrderCancelledEvent {
+                        order_id: cmd.order_id,
+                    })])
                 } else {
-                    // In case of validation failure, return empty list of events or error event
-                    vec![]
+                    Ok(vec![])
                 }
             }
         }),
-        // Evolve the state based on the event(s)
         evolve: Box::new(|state, event| {
             let mut new_state = state.clone();
-            // Exhaustive pattern matching on the event
             match event {
-                OrderEvent::Created(created_event) => {
-                    new_state.order_id = created_event.order_id;
-                    new_state.customer_name = created_event.customer_name.to_owned();
-                    new_state.items = created_event.items.to_owned();
+                OrderEvent::Created(evt) => {
+                    new_state.order_id = evt.order_id;
+                    new_state.customer_name = evt.customer_name.to_owned();
+                    new_state.items = evt.items.to_owned();
                 }
-                OrderEvent::Updated(updated_event) => {
-                    new_state.items = updated_event.updated_items.to_owned();
+                OrderEvent::Updated(evt) => {
+                    new_state.items = evt.updated_items.to_owned();
                 }
                 OrderEvent::Cancelled(_) => {
                     new_state.is_cancelled = true;
@@ -323,7 +313,6 @@ fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
             }
             new_state
         }),
-        // Initial state
         initial_state: Box::new(|| OrderState {
             order_id: 0,
             customer_name: "".to_string(),
