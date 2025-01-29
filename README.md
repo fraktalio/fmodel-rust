@@ -10,7 +10,7 @@
 * [**f`(`model`)`** - Functional Domain Modeling with Rust](#fmodel---functional-domain-modeling-with-rust)
   * [`IOR<Library, Inspiration>`](#iorlibrary-inspiration)
   * [Abstraction and generalization](#abstraction-and-generalization)
-  * [`Box<dyn Fn(&C, &S) -> Vec<E>>`](#boxdyn-fnc-s---vece)
+  * [`Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error>`](#boxdyn-fnc-s---vece)
   * [`Box<dyn Fn(&S, &E) -> S>`](#boxdyn-fns-e---s)
   * [Decider](#decider)
     * [Event-sourcing aggregate](#event-sourcing-aggregate)
@@ -268,7 +268,7 @@ Fmodel library offers generic and abstract components to specialize in for your 
  - Decider - data type that represents the main decision-making algorithm.
 
 ```rust
-fn order_decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
+fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
     Decider {
         decide: Box::new(|command, state| match command {
             OrderCommand::Create(cmd) => Ok(vec![OrderEvent::Created(OrderCreatedEvent {
