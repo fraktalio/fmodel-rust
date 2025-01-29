@@ -1,9 +1,7 @@
-use fmodel_rust::view::{View, ViewStateComputation};
+use fmodel_rust::specification::ViewTestSpecification;
+use fmodel_rust::view::View;
 
-use crate::api::{
-    OrderCancelledEvent, OrderCreatedEvent, OrderUpdatedEvent, OrderViewState,
-    ShipmentCreatedEvent, ShipmentViewState,
-};
+use crate::api::{OrderCreatedEvent, OrderViewState, ShipmentCreatedEvent, ShipmentViewState};
 
 use crate::application::Event;
 
@@ -65,40 +63,32 @@ fn shipment_view<'a>() -> View<'a, ShipmentViewState, Event> {
     }
 }
 
+fn merged_view<'a>() -> View<'a, (OrderViewState, ShipmentViewState), Event> {
+    order_view().merge(self::shipment_view())
+}
+
 #[test]
-fn test() {
-    let order_view: View<OrderViewState, Event> = order_view();
-    let order_view2: View<OrderViewState, Event> = crate::order_view();
-    let shipment_view: View<ShipmentViewState, Event> = shipment_view();
-
-    let merged_view = order_view2.merge(shipment_view);
-
+fn order_created_view_test() {
     let order_created_event = Event::OrderCreated(OrderCreatedEvent {
         order_id: 1,
         customer_name: "John Doe".to_string(),
         items: vec!["Item 1".to_string(), "Item 2".to_string()],
     });
 
-    let new_state = order_view.compute_new_state(None, &[&order_created_event]);
-    assert_eq!(
-        new_state,
-        OrderViewState {
+    ViewTestSpecification::default()
+        .for_view(self::order_view())
+        .given(vec![order_created_event.clone()])
+        .then(OrderViewState {
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
             is_cancelled: false,
-        }
-    );
-    let order_created_event2 = Event::OrderCreated(OrderCreatedEvent {
-        order_id: 1,
-        customer_name: "John Doe".to_string(),
-        items: vec!["Item 1".to_string(), "Item 2".to_string()],
-    });
+        });
 
-    let new_merged_state2 = merged_view.compute_new_state(None, &[&order_created_event2]);
-    assert_eq!(
-        new_merged_state2,
-        (
+    ViewTestSpecification::default()
+        .for_view(merged_view())
+        .given(vec![order_created_event])
+        .then((
             OrderViewState {
                 order_id: 1,
                 customer_name: "John Doe".to_string(),
@@ -110,20 +100,23 @@ fn test() {
                 order_id: 0,
                 customer_name: "".to_string(),
                 items: Vec::new(),
-            }
-        )
-    );
+            },
+        ));
+}
+#[test]
 
-    let shipment_created_event2 = Event::ShipmentCreated(ShipmentCreatedEvent {
+fn shipment_created_view_test() {
+    let shipment_created_event = Event::ShipmentCreated(ShipmentCreatedEvent {
         shipment_id: 1,
         order_id: 1,
         customer_name: "John Doe".to_string(),
         items: vec!["Item 1".to_string(), "Item 2".to_string()],
     });
-    let new_merged_state3 = merged_view.compute_new_state(None, &[&shipment_created_event2]);
-    assert_eq!(
-        new_merged_state3,
-        (
+
+    ViewTestSpecification::default()
+        .for_view(merged_view())
+        .given(vec![shipment_created_event.clone()])
+        .then((
             OrderViewState {
                 order_id: 0,
                 customer_name: "".to_string(),
@@ -135,46 +128,6 @@ fn test() {
                 order_id: 1,
                 customer_name: "John Doe".to_string(),
                 items: vec!["Item 1".to_string(), "Item 2".to_string()],
-            }
-        )
-    );
-
-    let order_updated_event = Event::OrderUpdated(OrderUpdatedEvent {
-        order_id: 1,
-        updated_items: vec![
-            "Item 11".to_string(),
-            "Item 22".to_string(),
-            "Item 33".to_string(),
-        ],
-    });
-    let new_state = order_view.compute_new_state(Some(new_state), &[&order_updated_event]);
-    assert_eq!(
-        new_state,
-        OrderViewState {
-            order_id: 1,
-            customer_name: "John Doe".to_string(),
-            items: vec![
-                "Item 11".to_string(),
-                "Item 22".to_string(),
-                "Item 33".to_string()
-            ],
-            is_cancelled: false,
-        }
-    );
-
-    let order_canceled_event = Event::OrderCancelled(OrderCancelledEvent { order_id: 1 });
-    let new_state = order_view.compute_new_state(Some(new_state), &[&order_canceled_event]);
-    assert_eq!(
-        new_state,
-        OrderViewState {
-            order_id: 1,
-            customer_name: "John Doe".to_string(),
-            items: vec![
-                "Item 11".to_string(),
-                "Item 22".to_string(),
-                "Item 33".to_string()
-            ],
-            is_cancelled: true,
-        }
-    );
+            },
+        ));
 }

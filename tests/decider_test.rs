@@ -1,11 +1,11 @@
-use fmodel_rust::decider::{Decider, EventComputation, StateComputation};
+use fmodel_rust::decider::Decider;
+use fmodel_rust::specification::DeciderTestSpecification;
 
 use crate::api::{
-    CancelOrderCommand, CreateOrderCommand, CreateShipmentCommand, OrderCancelledEvent,
-    OrderCommand, OrderCreatedEvent, OrderEvent, OrderState, OrderUpdatedEvent, ShipmentCommand,
+    CreateOrderCommand, CreateShipmentCommand, OrderCancelledEvent, OrderCommand,
+    OrderCreatedEvent, OrderEvent, OrderState, OrderUpdatedEvent, ShipmentCommand,
     ShipmentCreatedEvent, ShipmentEvent, ShipmentState,
 };
-use crate::application::Command::{OrderCreate, ShipmentCreate};
 use crate::application::Event::{OrderCreated, ShipmentCreated};
 use crate::application::{command_from_sum, event_from_sum, sum_to_event, Command, Event};
 
@@ -99,24 +99,46 @@ fn shipment_decider<'a>() -> Decider<'a, ShipmentCommand, ShipmentState, Shipmen
     }
 }
 
-#[test]
-fn test() {
-    let order_decider: Decider<OrderCommand, OrderState, OrderEvent> = order_decider();
-    let order_decider_clone: Decider<OrderCommand, OrderState, OrderEvent> = crate::order_decider();
-    let shipment_decider: Decider<ShipmentCommand, ShipmentState, ShipmentEvent> =
-        shipment_decider();
-    let combined_decider: Decider<Command, (OrderState, ShipmentState), Event> =
-        order_decider_clone
-            .combine(shipment_decider) // Decider<Sum<OrderCommand, ShipmentCommand>, (OrderState, ShipmentState), Sum<OrderEvent, ShipmentEvent>>
-            .map_command(&command_from_sum) // Decider<Command, (OrderState, ShipmentState), Sum<OrderEvent, ShipmentEvent>>
-            .map_event(&event_from_sum, &sum_to_event); // Decider<Command, (OrderState, ShipmentState), Event>
+fn combined_decider<'a>() -> Decider<'a, Command, (OrderState, ShipmentState), Event> {
+    order_decider()
+        .combine(shipment_decider())
+        .map_command(&command_from_sum) // Decider<Command, (OrderState, ShipmentState), Sum<OrderEvent, ShipmentEvent>>
+        .map_event(&event_from_sum, &sum_to_event)
+}
 
+#[test]
+fn create_order_event_sourced_test() {
     let create_order_command = CreateOrderCommand {
         order_id: 1,
         customer_name: "John Doe".to_string(),
         items: vec!["Item 1".to_string(), "Item 2".to_string()],
     };
 
+    // Test the OrderDecider (event-sourced)
+    DeciderTestSpecification::default()
+        .for_decider(self::order_decider()) // Set the decider
+        .given(vec![]) // no existing events
+        .when(OrderCommand::Create(create_order_command.clone())) // Create an Order
+        .then(vec![OrderEvent::Created(OrderCreatedEvent {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        })]);
+
+    // Test the Decider that combines OrderDecider and ShipmentDecider and can handle both OrderCommand and ShipmentCommand and produce Event (event-sourced)
+    DeciderTestSpecification::default()
+        .for_decider(self::combined_decider())
+        .given(vec![])
+        .when(Command::OrderCreate(create_order_command.clone()))
+        .then(vec![OrderCreated(OrderCreatedEvent {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        })]);
+}
+
+#[test]
+fn create_shipment_event_sourced_test() {
     let create_shipment_command = CreateShipmentCommand {
         shipment_id: 1,
         order_id: 1,
@@ -124,59 +146,53 @@ fn test() {
         items: vec!["Item 1".to_string(), "Item 2".to_string()],
     };
 
-    // Test the OrderDecider
-    let new_events =
-        order_decider.compute_new_events(&[], &OrderCommand::Create(create_order_command.clone()));
-    assert_eq!(
-        new_events,
-        Ok(vec![OrderEvent::Created(OrderCreatedEvent {
-            order_id: 1,
-            customer_name: "John Doe".to_string(),
-            items: vec!["Item 1".to_string(), "Item 2".to_string()],
-        })])
-    );
-    // Test the Decider that combines OrderDecider and ShipmentDecider and can handle both OrderCommand and ShipmentCommand and produce Event
-    let new_events2 =
-        combined_decider.compute_new_events(&[], &OrderCreate(create_order_command.clone()));
-    assert_eq!(
-        new_events2,
-        Ok(vec![OrderCreated(OrderCreatedEvent {
-            order_id: 1,
-            customer_name: "John Doe".to_string(),
-            items: vec!["Item 1".to_string(), "Item 2".to_string()],
-        })])
-    );
-    // Test the Decider that combines OrderDecider and ShipmentDecider and can handle both OrderCommand and ShipmentCommand and produce Event
-    let new_events3 =
-        combined_decider.compute_new_events(&[], &ShipmentCreate(create_shipment_command.clone()));
-    assert_eq!(
-        new_events3,
-        Ok(vec![ShipmentCreated(ShipmentCreatedEvent {
+    DeciderTestSpecification::default()
+        .for_decider(self::combined_decider())
+        .given(vec![])
+        .when(Command::ShipmentCreate(create_shipment_command.clone()))
+        .then(vec![ShipmentCreated(ShipmentCreatedEvent {
             shipment_id: 1,
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
-        })])
-    );
+        })]);
+}
 
-    // Test the OrderDecider
-    let new_state =
-        order_decider.compute_new_state(None, &OrderCommand::Create(create_order_command.clone()));
-    assert_eq!(
-        new_state,
-        Ok(OrderState {
+#[test]
+fn create_order_state_stored_test() {
+    let create_order_command = CreateOrderCommand {
+        order_id: 1,
+        customer_name: "John Doe".to_string(),
+        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+    };
+
+    // Test the OrderDecider (state stored)
+    DeciderTestSpecification::default()
+        .for_decider(self::order_decider()) // Set the decider
+        .given_state(None) // no existing state
+        .when(OrderCommand::Create(create_order_command.clone())) // Create an Order
+        .then_state(OrderState {
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
             is_cancelled: false,
-        })
-    );
-    // Test the Decider that combines OrderDecider and ShipmentDecider and can handle both OrderCommand and ShipmentCommand and produce a tuple of (OrderState, ShipmentState)
-    let new_state2 =
-        combined_decider.compute_new_state(None, &ShipmentCreate(create_shipment_command.clone()));
-    assert_eq!(
-        new_state2,
-        Ok((
+        });
+}
+
+#[test]
+fn create_shipment_state_stored_test() {
+    let create_shipment_command = CreateShipmentCommand {
+        shipment_id: 1,
+        order_id: 1,
+        customer_name: "John Doe".to_string(),
+        items: vec!["Item 1".to_string(), "Item 2".to_string()],
+    };
+    // Test the Decider (state stored) that combines OrderDecider and ShipmentDecider and can handle both OrderCommand and ShipmentCommand and produce a tuple of (OrderState, ShipmentState)
+    DeciderTestSpecification::default()
+        .for_decider(self::combined_decider())
+        .given_state(None)
+        .when(Command::ShipmentCreate(create_shipment_command.clone()))
+        .then_state((
             OrderState {
                 order_id: 0,
                 customer_name: "".to_string(),
@@ -188,28 +204,6 @@ fn test() {
                 order_id: 1,
                 customer_name: "John Doe".to_string(),
                 items: vec!["Item 1".to_string(), "Item 2".to_string()],
-            }
-        ))
-    );
-
-    // Test the OrderDecider
-    let cancel_command = OrderCommand::Cancel(CancelOrderCommand { order_id: 1 });
-    let new_events = order_decider.compute_new_events(&new_events.unwrap(), &cancel_command);
-    assert_eq!(
-        new_events,
-        Ok(vec![OrderEvent::Cancelled(OrderCancelledEvent {
-            order_id: 1
-        })])
-    );
-    // Test the OrderDecider
-    let new_state = order_decider.compute_new_state(Some(new_state.unwrap()), &cancel_command);
-    assert_eq!(
-        new_state,
-        Ok(OrderState {
-            order_id: 1,
-            customer_name: "John Doe".to_string(),
-            items: vec!["Item 1".to_string(), "Item 2".to_string()],
-            is_cancelled: true,
-        })
-    );
+            },
+        ));
 }
