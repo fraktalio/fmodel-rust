@@ -102,8 +102,8 @@ fn shipment_decider<'a>() -> Decider<'a, ShipmentCommand, ShipmentState, Shipmen
 fn combined_decider<'a>() -> Decider<'a, Command, (OrderState, ShipmentState), Event> {
     order_decider()
         .combine(shipment_decider())
-        .map_command(&command_from_sum) // Decider<Command, (OrderState, ShipmentState), Sum<OrderEvent, ShipmentEvent>>
-        .map_event(&event_from_sum, &sum_to_event)
+        .map_command(command_from_sum) // Decider<Command, (OrderState, ShipmentState), Sum<OrderEvent, ShipmentEvent>>
+        .map_event(event_from_sum, sum_to_event)
 }
 
 #[test]

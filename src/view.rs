@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{EvolveFunction, InitialStateFunction, Sum, View3, View4, View5, View6};
 
 /// [View] represents the event handling algorithm, responsible for translating the events into denormalized state, which is more adequate for querying.
@@ -88,17 +90,23 @@ pub struct View<'a, S: 'a, E: 'a> {
 impl<'a, S, E> View<'a, S, E> {
     /// Maps the View over the S/State type parameter.
     /// Creates a new instance of [View]`<S2, E>`.
-    pub fn map_state<S2, F1, F2>(self, f1: &'a F1, f2: &'a F2) -> View<'a, S2, E>
+    pub fn map_state<S2, F1, F2>(self, f1: F1, f2: F2) -> View<'a, S2, E>
     where
-        F1: Fn(&S2) -> S + Send + Sync,
-        F2: Fn(&S) -> S2 + Send + Sync,
+        F1: Fn(&S2) -> S + Send + Sync + 'a,
+        F2: Fn(&S) -> S2 + Send + Sync + 'a,
     {
-        let new_evolve = Box::new(move |s2: &S2, e: &E| {
-            let s = f1(s2);
-            f2(&(self.evolve)(&s, e))
-        });
+        let f1 = Arc::new(f1);
+        let f2 = Arc::new(f2);
 
-        let new_initial_state = Box::new(move || f2(&(self.initial_state)()));
+        let new_evolve = {
+            let f2 = Arc::clone(&f2);
+            Box::new(move |s2: &S2, e: &E| {
+                let s = f1(s2);
+                f2(&(self.evolve)(&s, e))
+            })
+        };
+
+        let new_initial_state = { Box::new(move || f2(&(self.initial_state)())) };
 
         View {
             evolve: new_evolve,
@@ -108,9 +116,9 @@ impl<'a, S, E> View<'a, S, E> {
 
     /// Maps the View over the E/Event type parameter.
     /// Creates a new instance of [View]`<S, E2>`.
-    pub fn map_event<E2, F>(self, f: &'a F) -> View<'a, S, E2>
+    pub fn map_event<E2, F>(self, f: F) -> View<'a, S, E2>
     where
-        F: Fn(&E2) -> E + Send + Sync,
+        F: Fn(&E2) -> E + Send + Sync + 'a,
     {
         let new_evolve = Box::new(move |s: &S, e2: &E2| {
             let e = f(e2);
@@ -204,8 +212,8 @@ impl<'a, S, E> View<'a, S, E> {
         S3: Clone,
     {
         self.merge(view2).merge(view3).map_state(
-            &|s: &(S, S2, S3)| ((s.0.clone(), s.1.clone()), s.2.clone()),
-            &|s: &((S, S2), S3)| (s.0 .0.clone(), s.0 .1.clone(), s.1.clone()),
+            |s: &(S, S2, S3)| ((s.0.clone(), s.1.clone()), s.2.clone()),
+            |s: &((S, S2), S3)| (s.0 .0.clone(), s.0 .1.clone(), s.1.clone()),
         )
     }
 
@@ -223,8 +231,8 @@ impl<'a, S, E> View<'a, S, E> {
         S4: Clone,
     {
         self.merge(view2).merge(view3).merge(view4).map_state(
-            &|s: &(S, S2, S3, S4)| (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
-            &|s: &(((S, S2), S3), S4)| {
+            |s: &(S, S2, S3, S4)| (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
+            |s: &(((S, S2), S3), S4)| {
                 (
                     s.0 .0 .0.clone(),
                     s.0 .0 .1.clone(),
@@ -256,13 +264,13 @@ impl<'a, S, E> View<'a, S, E> {
             .merge(view4)
             .merge(view5)
             .map_state(
-                &|s: &(S, S2, S3, S4, S5)| {
+                |s: &(S, S2, S3, S4, S5)| {
                     (
                         (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
                         s.4.clone(),
                     )
                 },
-                &|s: &((((S, S2), S3), S4), S5)| {
+                |s: &((((S, S2), S3), S4), S5)| {
                     (
                         s.0 .0 .0 .0.clone(),
                         s.0 .0 .0 .1.clone(),
@@ -298,7 +306,7 @@ impl<'a, S, E> View<'a, S, E> {
             .merge(view5)
             .merge(view6)
             .map_state(
-                &|s: &(S, S2, S3, S4, S5, S6)| {
+                |s: &(S, S2, S3, S4, S5, S6)| {
                     (
                         (
                             (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
@@ -307,7 +315,7 @@ impl<'a, S, E> View<'a, S, E> {
                         s.5.clone(),
                     )
                 },
-                &|s: &(((((S, S2), S3), S4), S5), S6)| {
+                |s: &(((((S, S2), S3), S4), S5), S6)| {
                     (
                         s.0 .0 .0 .0 .0.clone(),
                         s.0 .0 .0 .0 .1.clone(),

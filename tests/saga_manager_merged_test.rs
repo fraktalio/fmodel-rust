@@ -83,7 +83,7 @@ async fn test() {
         SimpleActionPublisher::new(),
         shipment_saga()
             .merge(order_saga())
-            .map_action(&sum_to_command2),
+            .map_action(sum_to_command2),
     );
     let result = saga_manager.handle(&order_created_event).await;
     assert!(result.is_ok());

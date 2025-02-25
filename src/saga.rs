@@ -89,9 +89,9 @@ pub struct Saga<'a, AR: 'a, A: 'a> {
 impl<'a, AR, A> Saga<'a, AR, A> {
     /// Maps the Saga over the A/Action type parameter.
     /// Creates a new instance of [Saga]`<AR, A2>`.
-    pub fn map_action<A2, F>(self, f: &'a F) -> Saga<'a, AR, A2>
+    pub fn map_action<A2, F>(self, f: F) -> Saga<'a, AR, A2>
     where
-        F: Fn(&A) -> A2 + Send + Sync,
+        F: Fn(&A) -> A2 + Send + Sync + 'a,
     {
         let new_react = Box::new(move |ar: &AR| {
             let a = (self.react)(ar);
@@ -103,9 +103,9 @@ impl<'a, AR, A> Saga<'a, AR, A> {
 
     /// Maps the Saga over the AR/ActionResult type parameter.
     /// Creates a new instance of [Saga]`<AR2, A>`.
-    pub fn map_action_result<AR2, F>(self, f: &'a F) -> Saga<'a, AR2, A>
+    pub fn map_action_result<AR2, F>(self, f: F) -> Saga<'a, AR2, A>
     where
-        F: Fn(&AR2) -> AR + Send + Sync,
+        F: Fn(&AR2) -> AR + Send + Sync + 'a,
     {
         let new_react = Box::new(move |ar2: &AR2| {
             let ar = f(ar2);
@@ -170,7 +170,7 @@ impl<'a, AR, A> Saga<'a, AR, A> {
     {
         self.merge(saga2)
             .merge(saga3)
-            .map_action(&|a: &Sum<A3, Sum<A2, A>>| match a {
+            .map_action(|a: &Sum<A3, Sum<A2, A>>| match a {
                 Sum::First(a) => Sum3::Third(a.clone()),
                 Sum::Second(Sum::First(a)) => Sum3::Second(a.clone()),
                 Sum::Second(Sum::Second(a)) => Sum3::First(a.clone()),
@@ -190,15 +190,14 @@ impl<'a, AR, A> Saga<'a, AR, A> {
         A3: Clone,
         A4: Clone,
     {
-        self.merge(saga2)
-            .merge(saga3)
-            .merge(saga4)
-            .map_action(&|a: &Sum<A4, Sum<A3, Sum<A2, A>>>| match a {
+        self.merge(saga2).merge(saga3).merge(saga4).map_action(
+            |a: &Sum<A4, Sum<A3, Sum<A2, A>>>| match a {
                 Sum::First(a) => Sum4::Fourth(a.clone()),
                 Sum::Second(Sum::First(a)) => Sum4::Third(a.clone()),
                 Sum::Second(Sum::Second(Sum::First(a))) => Sum4::Second(a.clone()),
                 Sum::Second(Sum::Second(Sum::Second(a))) => Sum4::First(a.clone()),
-            })
+            },
+        )
     }
 
     #[allow(clippy::type_complexity)]
@@ -221,7 +220,7 @@ impl<'a, AR, A> Saga<'a, AR, A> {
             .merge(saga3)
             .merge(saga4)
             .merge(saga5)
-            .map_action(&|a: &Sum<A5, Sum<A4, Sum<A3, Sum<A2, A>>>>| match a {
+            .map_action(|a: &Sum<A5, Sum<A4, Sum<A3, Sum<A2, A>>>>| match a {
                 Sum::First(a) => Sum5::Fifth(a.clone()),
                 Sum::Second(Sum::First(a)) => Sum5::Fourth(a.clone()),
                 Sum::Second(Sum::Second(Sum::First(a))) => Sum5::Third(a.clone()),
@@ -254,7 +253,7 @@ impl<'a, AR, A> Saga<'a, AR, A> {
             .merge(saga5)
             .merge(saga6)
             .map_action(
-                &|a: &Sum<A6, Sum<A5, Sum<A4, Sum<A3, Sum<A2, A>>>>>| match a {
+                |a: &Sum<A6, Sum<A5, Sum<A4, Sum<A3, Sum<A2, A>>>>>| match a {
                     Sum::First(a) => Sum6::Sixth(a.clone()),
                     Sum::Second(Sum::First(a)) => Sum6::Fifth(a.clone()),
                     Sum::Second(Sum::Second(Sum::First(a))) => Sum6::Fourth(a.clone()),
