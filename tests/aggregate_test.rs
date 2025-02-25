@@ -183,7 +183,7 @@ async fn es_test() {
     let repository = InMemoryOrderEventRepository::new();
     let aggregate = Arc::new(EventSourcedAggregate::new(
         repository,
-        decider().map_error(&|()| AggregateError::DomainError("Decider error".to_string())),
+        decider().map_error(|()| AggregateError::DomainError("Decider error".to_string())),
     ));
     // Makes a clone of the Arc pointer.
     // This creates another pointer to the same allocation, increasing the strong reference count.
@@ -294,7 +294,7 @@ async fn ss_test() {
     let repository = InMemoryOrderStateRepository::new();
     let aggregate = Arc::new(StateStoredAggregate::new(
         repository,
-        decider().map_error(&|()| AggregateError::DomainError("Decider error".to_string())),
+        decider().map_error(|()| AggregateError::DomainError("Decider error".to_string())),
     ));
     let aggregate2 = Arc::clone(&aggregate);
 

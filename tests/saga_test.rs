@@ -84,7 +84,7 @@ fn test() {
     let shipment_saga_2: Saga<Event, OrderCommand> = crate::shipment_saga_2();
     let merged_saga = order_saga_2
         .merge(shipment_saga_2)
-        .map_action(&sum_to_command);
+        .map_action(sum_to_command);
 
     let order_created_event = OrderEvent::Created(OrderCreatedEvent {
         order_id: 1,

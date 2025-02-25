@@ -267,7 +267,7 @@ async fn event_sourced_aggregate_test() {
     let repository = InMemoryEventRepository::new();
     let aggregate = Arc::new(EventSourcedAggregate::new(
         repository,
-        combined_decider.map_error(&|()| AggregateError::DomainError("Decider error".to_string())),
+        combined_decider.map_error(|()| AggregateError::DomainError("Decider error".to_string())),
     ));
     // Makes a clone of the Arc pointer.
     // This creates another pointer to the same allocation, increasing the strong reference count.
@@ -381,11 +381,11 @@ async fn orchestrated_event_sourced_aggregate_test() {
         .map_event(&event_from_sum, &sum_to_event); // Decider<Command, (OrderState, ShipmentState), Event>
     let combined_saga = order_saga()
         .merge(shipment_saga())
-        .map_action(&sum_to_command);
+        .map_action(sum_to_command);
     let repository = InMemoryEventRepository::new();
     let aggregate = Arc::new(EventSourcedOrchestratingAggregate::new(
         repository,
-        combined_decider.map_error(&|()| AggregateError::DomainError("Decider error".to_string())),
+        combined_decider.map_error(|()| AggregateError::DomainError("Decider error".to_string())),
         combined_saga,
     ));
     // Makes a clone of the Arc pointer.
@@ -538,7 +538,7 @@ async fn state_stored_aggregate_test() {
     let repository = InMemoryStateRepository::new();
     let aggregate = Arc::new(StateStoredAggregate::new(
         repository,
-        combined_decider.map_error(&|()| AggregateError::DomainError("Decider error".to_string())),
+        combined_decider.map_error(|()| AggregateError::DomainError("Decider error".to_string())),
     ));
     let aggregate2 = Arc::clone(&aggregate);
 
@@ -713,12 +713,12 @@ async fn state_stored_combined_test() {
 
     let combined_saga = order_saga()
         .merge(shipment_saga())
-        .map_action(&sum_to_command);
+        .map_action(sum_to_command);
 
     let repository = InMemoryStateRepository::new();
     let aggregate = Arc::new(StateStoredOrchestratingAggregate::new(
         repository,
-        combined_decider.map_error(&|()| AggregateError::DomainError("Decider error".to_string())),
+        combined_decider.map_error(|()| AggregateError::DomainError("Decider error".to_string())),
         combined_saga,
     ));
     let aggregate2 = Arc::clone(&aggregate);

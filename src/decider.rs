@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     DecideFunction, Decider3, Decider4, Decider5, Decider6, EvolveFunction, InitialStateFunction,
     Sum, Sum3, Sum4, Sum5, Sum6,
@@ -163,22 +165,31 @@ pub struct Decider<'a, C: 'a, S: 'a, E: 'a, Error: 'a = ()> {
 impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
     /// Maps the Decider over the S/State type parameter.
     /// Creates a new instance of [Decider]`<C, S2, E, Error>`.
-    pub fn map_state<S2, F1, F2>(self, f1: &'a F1, f2: &'a F2) -> Decider<'a, C, S2, E, Error>
+    pub fn map_state<S2, F1, F2>(self, f1: F1, f2: F2) -> Decider<'a, C, S2, E, Error>
     where
-        F1: Fn(&S2) -> S + Send + Sync,
-        F2: Fn(&S) -> S2 + Send + Sync,
+        F1: Fn(&S2) -> S + Send + Sync + 'a,
+        F2: Fn(&S) -> S2 + Send + Sync + 'a,
     {
-        let new_decide = Box::new(move |c: &C, s2: &S2| {
-            let s = f1(s2);
-            (self.decide)(c, &s)
-        });
+        let f1 = Arc::new(f1);
+        let f2 = Arc::new(f2);
 
-        let new_evolve = Box::new(move |s2: &S2, e: &E| {
-            let s = f1(s2);
-            f2(&(self.evolve)(&s, e))
-        });
+        let new_decide = {
+            let f1 = Arc::clone(&f1);
+            Box::new(move |c: &C, s2: &S2| {
+                let s = f1(s2);
+                (self.decide)(c, &s)
+            })
+        };
 
-        let new_initial_state = Box::new(move || f2(&(self.initial_state)()));
+        let new_evolve = {
+            let f2 = Arc::clone(&f2);
+            Box::new(move |s2: &S2, e: &E| {
+                let s = f1(s2);
+                f2(&(self.evolve)(&s, e))
+            })
+        };
+
+        let new_initial_state = { Box::new(move || f2(&(self.initial_state)())) };
 
         Decider {
             decide: new_decide,
@@ -189,10 +200,10 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
 
     /// Maps the Decider over the E/Event type parameter.
     /// Creates a new instance of [Decider]`<C, S, E2, Error>`.
-    pub fn map_event<E2, F1, F2>(self, f1: &'a F1, f2: &'a F2) -> Decider<'a, C, S, E2, Error>
+    pub fn map_event<E2, F1, F2>(self, f1: F1, f2: F2) -> Decider<'a, C, S, E2, Error>
     where
-        F1: Fn(&E2) -> E + Send + Sync,
-        F2: Fn(&E) -> E2 + Send + Sync,
+        F1: Fn(&E2) -> E + Send + Sync + 'a,
+        F2: Fn(&E) -> E2 + Send + Sync + 'a,
     {
         let new_decide = Box::new(move |c: &C, s: &S| {
             (self.decide)(c, s).map(|result| result.into_iter().map(|e: E| f2(&e)).collect())
@@ -214,9 +225,9 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
 
     /// Maps the Decider over the C/Command type parameter.
     /// Creates a new instance of [Decider]`<C2, S, E, Error>`.
-    pub fn map_command<C2, F>(self, f: &'a F) -> Decider<'a, C2, S, E, Error>
+    pub fn map_command<C2, F>(self, f: F) -> Decider<'a, C2, S, E, Error>
     where
-        F: Fn(&C2) -> C + Send + Sync,
+        F: Fn(&C2) -> C + Send + Sync + 'a,
     {
         let new_decide = Box::new(move |c2: &C2, s: &S| {
             let c = f(c2);
@@ -236,9 +247,9 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
 
     /// Maps the Decider over the Error type parameter.
     /// Creates a new instance of [Decider]`<C, S, E, Error2>`.
-    pub fn map_error<Error2, F>(self, f: &'a F) -> Decider<'a, C, S, E, Error2>
+    pub fn map_error<Error2, F>(self, f: F) -> Decider<'a, C, S, E, Error2>
     where
-        F: Fn(&Error) -> Error2 + Send + Sync,
+        F: Fn(&Error) -> Error2 + Send + Sync + 'a,
     {
         let new_decide = Box::new(move |c: &C, s: &S| (self.decide)(c, s).map_err(|e| f(&e)));
 
@@ -337,22 +348,22 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
         combined
             .combine(decider3)
             .map_state(
-                &|s: &(S, S2, S3)| ((s.0.clone(), s.1.clone()), s.2.clone()),
-                &|s: &((S, S2), S3)| (s.0 .0.clone(), s.0 .1.clone(), s.1.clone()),
+                |s: &(S, S2, S3)| ((s.0.clone(), s.1.clone()), s.2.clone()),
+                |s: &((S, S2), S3)| (s.0 .0.clone(), s.0 .1.clone(), s.1.clone()),
             )
             .map_event(
-                &|e: &Sum3<E, E2, E3>| match e {
+                |e: &Sum3<E, E2, E3>| match e {
                     Sum3::First(ref e) => Sum::First(Sum::First(e.clone())),
                     Sum3::Second(ref e) => Sum::First(Sum::Second(e.clone())),
                     Sum3::Third(ref e) => Sum::Second(e.clone()),
                 },
-                &|e| match e {
+                |e: &Sum<Sum<E, E2>, E3>| match e {
                     Sum::First(Sum::First(e)) => Sum3::First(e.clone()),
                     Sum::First(Sum::Second(e)) => Sum3::Second(e.clone()),
                     Sum::Second(e) => Sum3::Third(e.clone()),
                 },
             )
-            .map_command(&|c: &Sum3<C, C2, C3>| match c {
+            .map_command(|c: &Sum3<C, C2, C3>| match c {
                 Sum3::First(c) => Sum::First(Sum::First(c.clone())),
                 Sum3::Second(c) => Sum::First(Sum::Second(c.clone())),
                 Sum3::Third(c) => Sum::Second(c.clone()),
@@ -386,8 +397,8 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
             .combine(decider3)
             .combine(decider4)
             .map_state(
-                &|s: &(S, S2, S3, S4)| (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
-                &|s: &(((S, S2), S3), S4)| {
+                |s: &(S, S2, S3, S4)| (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
+                |s: &(((S, S2), S3), S4)| {
                     (
                         s.0 .0 .0.clone(),
                         s.0 .0 .1.clone(),
@@ -397,20 +408,20 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
                 },
             )
             .map_event(
-                &|e: &Sum4<E, E2, E3, E4>| match e {
+                |e: &Sum4<E, E2, E3, E4>| match e {
                     Sum4::First(e) => Sum::First(Sum::First(Sum::First(e.clone()))),
                     Sum4::Second(e) => Sum::First(Sum::First(Sum::Second(e.clone()))),
                     Sum4::Third(e) => Sum::First(Sum::Second(e.clone())),
                     Sum4::Fourth(e) => Sum::Second(e.clone()),
                 },
-                &|e| match e {
+                |e: &Sum<Sum<Sum<E, E2>, E3>, E4>| match e {
                     Sum::First(Sum::First(Sum::First(e))) => Sum4::First(e.clone()),
                     Sum::First(Sum::First(Sum::Second(e))) => Sum4::Second(e.clone()),
                     Sum::First(Sum::Second(e)) => Sum4::Third(e.clone()),
                     Sum::Second(e) => Sum4::Fourth(e.clone()),
                 },
             )
-            .map_command(&|c: &Sum4<C, C2, C3, C4>| match c {
+            .map_command(|c: &Sum4<C, C2, C3, C4>| match c {
                 Sum4::First(c) => Sum::First(Sum::First(Sum::First(c.clone()))),
                 Sum4::Second(c) => Sum::First(Sum::First(Sum::Second(c.clone()))),
                 Sum4::Third(c) => Sum::First(Sum::Second(c.clone())),
@@ -451,13 +462,13 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
             .combine(decider4)
             .combine(decider5)
             .map_state(
-                &|s: &(S, S2, S3, S4, S5)| {
+                |s: &(S, S2, S3, S4, S5)| {
                     (
                         (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
                         s.4.clone(),
                     )
                 },
-                &|s: &((((S, S2), S3), S4), S5)| {
+                |s: &((((S, S2), S3), S4), S5)| {
                     (
                         s.0 .0 .0 .0.clone(),
                         s.0 .0 .0 .1.clone(),
@@ -468,14 +479,14 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
                 },
             )
             .map_event(
-                &|e: &Sum5<E, E2, E3, E4, E5>| match e {
+                |e: &Sum5<E, E2, E3, E4, E5>| match e {
                     Sum5::First(e) => Sum::First(Sum::First(Sum::First(Sum::First(e.clone())))),
                     Sum5::Second(e) => Sum::First(Sum::First(Sum::First(Sum::Second(e.clone())))),
                     Sum5::Third(e) => Sum::First(Sum::First(Sum::Second(e.clone()))),
                     Sum5::Fourth(e) => Sum::First(Sum::Second(e.clone())),
                     Sum5::Fifth(e) => Sum::Second(e.clone()),
                 },
-                &|e| match e {
+                |e: &Sum<Sum<Sum<Sum<E, E2>, E3>, E4>, E5>| match e {
                     Sum::First(Sum::First(Sum::First(Sum::First(e)))) => Sum5::First(e.clone()),
                     Sum::First(Sum::First(Sum::First(Sum::Second(e)))) => Sum5::Second(e.clone()),
                     Sum::First(Sum::First(Sum::Second(e))) => Sum5::Third(e.clone()),
@@ -483,7 +494,7 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
                     Sum::Second(e) => Sum5::Fifth(e.clone()),
                 },
             )
-            .map_command(&|c: &Sum5<C, C2, C3, C4, C5>| match c {
+            .map_command(|c: &Sum5<C, C2, C3, C4, C5>| match c {
                 Sum5::First(c) => Sum::First(Sum::First(Sum::First(Sum::First(c.clone())))),
                 Sum5::Second(c) => Sum::First(Sum::First(Sum::First(Sum::Second(c.clone())))),
                 Sum5::Third(c) => Sum::First(Sum::First(Sum::Second(c.clone()))),
@@ -530,7 +541,7 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
             .combine(decider5)
             .combine(decider6)
             .map_state(
-                &|s: &(S, S2, S3, S4, S5, S6)| {
+                |s: &(S, S2, S3, S4, S5, S6)| {
                     (
                         (
                             (((s.0.clone(), s.1.clone()), s.2.clone()), s.3.clone()),
@@ -539,7 +550,7 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
                         s.5.clone(),
                     )
                 },
-                &|s: &(((((S, S2), S3), S4), S5), S6)| {
+                |s: &(((((S, S2), S3), S4), S5), S6)| {
                     (
                         s.0 .0 .0 .0 .0.clone(),
                         s.0 .0 .0 .0 .1.clone(),
@@ -551,7 +562,7 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
                 },
             )
             .map_event(
-                &|e: &Sum6<E, E2, E3, E4, E5, E6>| match e {
+                |e: &Sum6<E, E2, E3, E4, E5, E6>| match e {
                     Sum6::First(e) => {
                         Sum::First(Sum::First(Sum::First(Sum::First(Sum::First(e.clone())))))
                     }
@@ -563,7 +574,7 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
                     Sum6::Fifth(e) => Sum::First(Sum::Second(e.clone())),
                     Sum6::Sixth(e) => Sum::Second(e.clone()),
                 },
-                &|e| match e {
+                |e: &Sum<Sum<Sum<Sum<Sum<E, E2>, E3>, E4>, E5>, E6>| match e {
                     Sum::First(Sum::First(Sum::First(Sum::First(Sum::First(e))))) => {
                         Sum6::First(e.clone())
                     }
@@ -576,7 +587,7 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
                     Sum::Second(e) => Sum6::Sixth(e.clone()),
                 },
             )
-            .map_command(&|c: &Sum6<C, C2, C3, C4, C5, C6>| match c {
+            .map_command(|c: &Sum6<C, C2, C3, C4, C5, C6>| match c {
                 Sum6::First(c) => {
                     Sum::First(Sum::First(Sum::First(Sum::First(Sum::First(c.clone())))))
                 }
