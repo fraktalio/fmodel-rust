@@ -12,4 +12,4 @@ serde = {version = "1.0.200", features = ["derive"]}
 [dev-dependencies]
 derive_more = { version = "2", features = ["display"] }
 
-tokio = { version = "1.37.0", features = ["rt", "rt-multi-thread", "macros"] }
+tokio = { version = "1.43.1", features = ["rt", "rt-multi-thread", "macros"] }
