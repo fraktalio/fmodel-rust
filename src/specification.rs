@@ -1,5 +1,7 @@
 //! ## A test specification DSL for deciders and views that supports the given-when-then format.
 
+use pretty_assertions::assert_eq;
+
 use crate::{
     decider::{Decider, EventComputation, StateComputation},
     view::{View, ViewStateComputation},
@@ -40,6 +42,7 @@ where
 
 impl<'a, Command, State, Event, Error> DeciderTestSpecification<'a, Command, State, Event, Error>
 where
+    Command: std::fmt::Debug,
     Event: PartialEq + std::fmt::Debug,
     State: PartialEq + std::fmt::Debug,
     Error: PartialEq + std::fmt::Debug,
@@ -91,7 +94,10 @@ where
                 panic!("Events were expected but the decider returned an error instead: {error:?}")
             }
         };
-        assert_eq!(new_events, expected_events);
+        assert_eq!(
+            new_events, expected_events,
+            "Actual and Expected events do not match!\nCommand: {command:?}\n",
+        );
     }
 
     #[allow(dead_code)]
@@ -113,7 +119,10 @@ where
                 panic!("State was expected but the decider returned an error instead: {error:?}")
             }
         };
-        assert_eq!(new_state, expected_state);
+        assert_eq!(
+            new_state, expected_state,
+            "Actual and Expected states do not match.\nCommand: {command:?}\n"
+        );
     }
 
     #[allow(dead_code)]
@@ -135,7 +144,10 @@ where
             }
             Err(error) => error,
         };
-        assert_eq!(error, expected_error);
+        assert_eq!(
+            error, expected_error,
+            "Actual and Expected errors do not match.\nCommand: {command:?}\n"
+        );
     }
 }
 
@@ -168,6 +180,7 @@ where
 impl<'a, State, Event> ViewTestSpecification<'a, State, Event>
 where
     State: PartialEq + std::fmt::Debug,
+    Event: std::fmt::Debug,
 {
     #[allow(dead_code)]
     /// Specify the view you want to test
@@ -197,6 +210,9 @@ where
         let event_refs: Vec<&Event> = events.iter().collect();
         let new_state_result = view.compute_new_state(Some(initial_state), &event_refs);
 
-        assert_eq!(new_state_result, expected_state);
+        assert_eq!(
+            new_state_result, expected_state,
+            "Actual and Expected states do not match.\nEvents: {events:?}\n"
+        );
     }
 }

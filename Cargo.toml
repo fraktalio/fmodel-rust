@@ -7,7 +7,7 @@ license = "Apache-2.0"
 
 [dependencies]
 serde = {version = "1.0.200", features = ["derive"]}
-
+pretty_assertions = "1.4.1"
 
 [dev-dependencies]
 derive_more = { version = "2", features = ["display"] }
