@@ -73,6 +73,7 @@ where
     }
 
     #[allow(dead_code)]
+    #[track_caller]
     /// Then expect result / new events
     pub fn then(self, expected_events: Vec<Event>) {
         let decider = self
@@ -86,15 +87,15 @@ where
         let new_events_result = decider.compute_new_events(&events, &command);
         let new_events = match new_events_result {
             Ok(events) => events,
-            Err(error) => panic!(
-                "Events were expected but the decider returned an error instead: {:?}",
-                error
-            ),
+            Err(error) => {
+                panic!("Events were expected but the decider returned an error instead: {error:?}")
+            }
         };
         assert_eq!(new_events, expected_events);
     }
 
     #[allow(dead_code)]
+    #[track_caller]
     /// Then expect result / new events
     pub fn then_state(self, expected_state: State) {
         let decider = self
@@ -108,15 +109,15 @@ where
         let new_state_result = decider.compute_new_state(state, &command);
         let new_state = match new_state_result {
             Ok(state) => state,
-            Err(error) => panic!(
-                "State was expected but the decider returned an error instead: {:?}",
-                error
-            ),
+            Err(error) => {
+                panic!("State was expected but the decider returned an error instead: {error:?}")
+            }
         };
         assert_eq!(new_state, expected_state);
     }
 
     #[allow(dead_code)]
+    #[track_caller]
     /// Then expect error result / these are not events
     pub fn then_error(self, expected_error: Error) {
         let decider = self
@@ -129,10 +130,9 @@ where
 
         let error_result = decider.compute_new_events(&events, &command);
         let error = match error_result {
-            Ok(events) => panic!(
-                "An error was expected but the decider returned events instead: {:?}",
-                events
-            ),
+            Ok(events) => {
+                panic!("An error was expected but the decider returned events instead: {events:?}")
+            }
             Err(error) => error,
         };
         assert_eq!(error, expected_error);
@@ -184,6 +184,7 @@ where
     }
 
     #[allow(dead_code)]
+    #[track_caller]
     /// Then expect evolving new state of the view
     pub fn then(self, expected_state: State) {
         let view = self
