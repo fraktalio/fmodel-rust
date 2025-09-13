@@ -430,10 +430,55 @@ Pushing these decisions from the core domain model is very valuable. Being able 
 
 ## Fearless Concurrency
 
-Splitting the computation in your program into multiple threads to run multiple tasks at the same time can improve performance.
-However, programming with threads has a reputation for being difficult. Rust’s type system and ownership model guarantee thread safety.
+`fmodel-rust` lets you choose between **single-threaded async** and **multi-threaded async** via a feature flag.
 
-Example of the concurrent execution of the aggregate:
+| Single-threaded world | Multi-threaded world               |
+| --------------------- | ---------------------------------- |
+| `Rc<T>`               | `Arc<T>`                           |
+| `RefCell<T>`          | `Mutex<T>` / `RwLock<T>`           |
+| `Rc<RefCell<T>>`      | `Arc<Mutex<T>>` / `Arc<RwLock<T>>` |
+
+
+
+### `Send` bound futures/Async (multi-threaded executors)
+
+```toml
+[dependencies]
+fmodel-rust = { version = "0.8.2" }
+```
+
+If you don’t enable the feature, the **default** mode requires `Send` so your futures can safely hop between threads:
+
+```rust
+#[cfg(not(feature = "not-send-futures"))]
+pub trait EventRepository<C, E, Version, Error> {
+    /// Fetches current events, based on the command.
+    /// Desugared `async fn fetch_events(&self, command: &C) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn fetch_events(
+        &self,
+        command: &C,
+    ) -> impl Future<Output = Result<Vec<(E, Version)>, Error>> + Send;
+    /// Saves events.
+    /// Desugared `async fn save(&self, events: &[E], latest_version: &Option<Version>) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn save(&self, events: &[E]) -> impl Future<Output = Result<Vec<(E, Version)>, Error>> + Send;
+
+    /// Version provider. It is used to provide the version/sequence of the stream to wich this event belongs to. Optimistic locking is useing this version to check if the event is already saved.
+    /// Desugared `async fn version_provider(&self, event: &E) -> Result<Option<Version>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn version_provider(
+        &self,
+        event: &E,
+    ) -> impl Future<Output = Result<Option<Version>, Error>> + Send;
+}
+```
+
+This mode is designed for multi-threaded runtimes like `tokio`’s default executor, where futures may be scheduled on any worker thread.
+Here, you typically wrap shared state in `Arc<Mutex<T>>` or `Arc<RwLock<T>>`.
+
+
+Example of the concurrent execution of the aggregate in multi-threaded environment (`Send` bound futures):
 
 ```rust
 async fn es_test() {
@@ -543,8 +588,82 @@ async fn es_test() {
 }
 ```
 
+### `Send` free futures/Async (single-threaded executors)
+
+```toml
+[dependencies]
+fmodel-rust = { version = "0.8.2", features = ["not-send-futures"] }
+```
+
+This mode removes the `Send` bound from async traits.
+It works well with single-threaded runtimes (`tokio::task::LocalSet`) and allows using lighter primitives like `Rc<RefCell<T>>`.
+
+```rust
+#[cfg(feature = "not-send-futures")]
+pub trait EventRepository<C, E, Version, Error> {
+    /// Fetches current events, based on the command.
+    /// Desugared `async fn fetch_events(&self, command: &C) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls.
+    fn fetch_events(&self, command: &C) -> impl Future<Output = Result<Vec<(E, Version)>, Error>>;
+    /// Saves events.
+    /// Desugared `async fn save(&self, events: &[E], latest_version: &Option<Version>) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls.
+    fn save(&self, events: &[E]) -> impl Future<Output = Result<Vec<(E, Version)>, Error>>;
+
+    /// Version provider. It is used to provide the version/sequence of the stream to wich this event belongs to. Optimistic locking is useing this version to check if the event is already saved.
+    /// Desugared `async fn version_provider(&self, event: &E) -> Result<Option<Version>, Error>;` to a normal `fn` that returns `impl Future`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls.
+    fn version_provider(&self, event: &E) -> impl Future<Output = Result<Option<Version>, Error>>;
+}
+```
+
+This approach has several benefits:
+
+- Simpler code: No need for `Arc`, `Mutex/RwLock`, or other expensive thread synchronization primitives.
+
+- Efficient design: This model aligns with the “Thread-per-Core” pattern, letting you safely run multiple async tasks concurrently on a single thread.
+
+
+Example of the concurrent execution of the aggregate in single-threaded environment (**behind feature** - `Send` free `Futures`):
+
+```rust
+async fn es_test_not_send() {
+    let repository = InMemoryOrderEventRepository::new();
+
+    let aggregate = Rc::new(EventSourcedAggregate::new(
+        repository,
+        decider().map_error(|()| AggregateError::DomainError("Decider error".to_string())),
+    ));
+    let aggregate2 = Rc::clone(&aggregate);
+
+    // Notice how we `move` here, which requires Rc (not ARc). If you do not move, Rc is not needed.
+    let task1 = async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 1,
+            customer_name: "Alice".to_string(),
+            items: vec!["Item1".to_string()],
+        });
+        let result = aggregate.handle(&command).await;
+        assert!(result.is_ok());
+    };
+
+    let task2 = async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
+    };
+
+    // Run both tasks concurrently on the same thread.
+    tokio::join!(task1, task2);
+}
+```
+
 You might wonder why all primitive types in Rust aren’t atomic and why standard library types aren’t implemented to use `Arc<T>` by default.
-The reason is that thread safety comes with a performance penalty that you only want to pay when you really need to.
+**The reason is that thread safety comes with a performance penalty that you only want to pay when you really need to.**
 
 **You choose how to run it!** You can run it in a single-threaded, multi-threaded, or distributed environment.
 
@@ -557,7 +676,7 @@ cargo add fmodel-rust
 Or add the following line to your `Cargo.toml` file:
 
 ```toml
-fmodel-rust = "0.8.0"
+fmodel-rust = "0.8.2"
 ```
 
 ## Examples
