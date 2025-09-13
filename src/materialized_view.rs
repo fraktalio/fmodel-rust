@@ -10,6 +10,7 @@ use crate::view::ViewStateComputation;
 /// - `E` - Event
 /// - `S` - State
 /// - `Error` - Error
+#[cfg(not(feature = "not-send-futures"))]
 pub trait ViewStateRepository<E, S, Error> {
     /// Fetches current state, based on the event.
     /// Desugared `async fn fetch_state(&self, event: &E) -> Result<Option<S>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`.
@@ -19,6 +20,25 @@ pub trait ViewStateRepository<E, S, Error> {
     /// Desugared `async fn save(&self, state: &S) -> Result<S, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`.
     /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
     fn save(&self, state: &S) -> impl Future<Output = Result<S, Error>> + Send;
+}
+
+/// View State Repository trait
+///
+/// Generic parameters:
+///
+/// - `E` - Event
+/// - `S` - State
+/// - `Error` - Error
+#[cfg(feature = "not-send-futures")]
+pub trait ViewStateRepository<E, S, Error> {
+    /// Fetches current state, based on the event.
+    /// Desugared `async fn fetch_state(&self, event: &E) -> Result<Option<S>, Error>;` to a normal `fn` that returns `impl Future`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls.
+    fn fetch_state(&self, event: &E) -> impl Future<Output = Result<Option<S>, Error>>;
+    /// Saves the new state.
+    /// Desugared `async fn save(&self, state: &S) -> Result<S, Error>;` to a normal `fn` that returns `impl Future`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls.
+    fn save(&self, state: &S) -> impl Future<Output = Result<S, Error>>;
 }
 
 /// Materialized View.
@@ -55,6 +75,7 @@ where
     }
 }
 
+#[cfg(not(feature = "not-send-futures"))]
 impl<S, E, Repository, View, Error> ViewStateRepository<E, S, Error>
     for MaterializedView<S, E, Repository, View, Error>
 where
@@ -75,6 +96,25 @@ where
     }
 }
 
+#[cfg(feature = "not-send-futures")]
+impl<S, E, Repository, View, Error> ViewStateRepository<E, S, Error>
+    for MaterializedView<S, E, Repository, View, Error>
+where
+    Repository: ViewStateRepository<E, S, Error>,
+    View: ViewStateComputation<E, S>,
+{
+    /// Fetches current state, based on the event.
+    async fn fetch_state(&self, event: &E) -> Result<Option<S>, Error> {
+        let state = self.repository.fetch_state(event).await?;
+        Ok(state)
+    }
+    /// Saves the new state.
+    async fn save(&self, state: &S) -> Result<S, Error> {
+        self.repository.save(state).await
+    }
+}
+
+#[cfg(not(feature = "not-send-futures"))]
 impl<S, E, Repository, View, Error> MaterializedView<S, E, Repository, View, Error>
 where
     Repository: ViewStateRepository<E, S, Error> + Sync,
@@ -82,6 +122,29 @@ where
     E: Sync,
     S: Sync,
     Error: Sync,
+{
+    /// Creates a new instance of [MaterializedView].
+    pub fn new(repository: Repository, view: View) -> Self {
+        MaterializedView {
+            repository,
+            view,
+            _marker: PhantomData,
+        }
+    }
+    /// Handles the event by fetching the state from the repository, computing new state based on the current state and the event, and saving the new state to the repository.
+    pub async fn handle(&self, event: &E) -> Result<S, Error> {
+        let state = self.fetch_state(event).await?;
+        let new_state = self.compute_new_state(state, &[event]);
+        let saved_state = self.save(&new_state).await?;
+        Ok(saved_state)
+    }
+}
+
+#[cfg(feature = "not-send-futures")]
+impl<S, E, Repository, View, Error> MaterializedView<S, E, Repository, View, Error>
+where
+    Repository: ViewStateRepository<E, S, Error>,
+    View: ViewStateComputation<E, S>,
 {
     /// Creates a new instance of [MaterializedView].
     pub fn new(repository: Repository, view: View) -> Self {

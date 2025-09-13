@@ -1,6 +1,8 @@
+#![cfg(feature = "not-send-futures")]
+
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use std::thread;
+use std::rc::Rc;
 
 use fmodel_rust::materialized_view::{MaterializedView, ViewStateRepository};
 use fmodel_rust::view::View;
@@ -43,13 +45,13 @@ fn view<'a>() -> View<'a, OrderViewState, OrderEvent> {
 }
 
 struct InMemoryViewOrderStateRepository {
-    states: RwLock<HashMap<u32, OrderViewState>>,
+    states: RefCell<HashMap<u32, OrderViewState>>,
 }
 
 impl InMemoryViewOrderStateRepository {
     fn new() -> Self {
         InMemoryViewOrderStateRepository {
-            states: RwLock::new(HashMap::new()),
+            states: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -64,16 +66,14 @@ impl ViewStateRepository<OrderEvent, OrderViewState, MaterializedViewError>
     ) -> Result<Option<OrderViewState>, MaterializedViewError> {
         Ok(self
             .states
-            .read()
-            .unwrap()
+            .borrow()
             .get(&event.identifier().parse::<u32>().unwrap())
             .cloned())
     }
 
     async fn save(&self, state: &OrderViewState) -> Result<OrderViewState, MaterializedViewError> {
         self.states
-            .write()
-            .unwrap()
+            .borrow_mut()
             .insert(state.order_id, state.clone());
         Ok(state.clone())
     }
@@ -82,12 +82,12 @@ impl ViewStateRepository<OrderEvent, OrderViewState, MaterializedViewError>
 #[tokio::test]
 async fn test() {
     let repository = InMemoryViewOrderStateRepository::new();
-    let materialized_view = Arc::new(MaterializedView::new(repository, view()));
-    let materialized_view1 = Arc::clone(&materialized_view);
-    let materialized_view2 = Arc::clone(&materialized_view);
+    let materialized_view = Rc::new(MaterializedView::new(repository, view()));
+    let materialized_view1 = Rc::clone(&materialized_view);
+    let materialized_view2 = Rc::clone(&materialized_view);
 
-    // Let's spawn two threads to simulate two concurrent requests
-    let handle1 = thread::spawn(|| async move {
+    // Let's spawn two tasks to simulate two concurrent requests
+    let task1 = async move {
         let event = OrderEvent::Created(OrderCreatedEvent {
             order_id: 1,
             customer_name: "John Doe".to_string(),
@@ -131,9 +131,9 @@ async fn test() {
                 is_cancelled: true,
             }
         );
-    });
+    };
 
-    let handle2 = thread::spawn(|| async move {
+    let task2 = async move {
         let event = OrderEvent::Created(OrderCreatedEvent {
             order_id: 2,
             customer_name: "John Doe".to_string(),
@@ -177,8 +177,8 @@ async fn test() {
                 is_cancelled: true,
             }
         );
-    });
+    };
 
-    handle1.join().unwrap().await;
-    handle2.join().unwrap().await;
+    // Run both tasks concurrently on the same thread.
+    let _ = tokio::join!(task1, task2);
 }

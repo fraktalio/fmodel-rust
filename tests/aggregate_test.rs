@@ -12,6 +12,7 @@ use crate::api::{
     OrderState, OrderUpdatedEvent,
 };
 use crate::application::AggregateError;
+use std::thread;
 
 mod api;
 mod application;
@@ -184,37 +185,32 @@ async fn es_test() {
         repository,
         decider().map_error(|()| AggregateError::DomainError("Decider error".to_string())),
     ));
+    let aggregate1 = Arc::clone(&aggregate);
     let aggregate2 = Arc::clone(&aggregate);
 
     // Spawn two async tasks instead of threads
-    let handle1 = tokio::spawn({
-        let aggregate = Arc::clone(&aggregate);
-        async move {
-            let command = OrderCommand::Create(CreateOrderCommand {
-                order_id: 1,
-                customer_name: "John Doe".to_string(),
-                items: vec!["Item 1".to_string(), "Item 2".to_string()],
-            });
-            let result = aggregate.handle(&command).await;
-            assert!(result.is_ok());
-        }
+    let handle1 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate1.handle(&command).await;
+        assert!(result.is_ok());
     });
 
-    let handle2 = tokio::spawn({
-        let aggregate2 = Arc::clone(&aggregate2);
-        async move {
-            let command = OrderCommand::Create(CreateOrderCommand {
-                order_id: 2,
-                customer_name: "John Doe".to_string(),
-                items: vec!["Item 1".to_string(), "Item 2".to_string()],
-            });
-            let result = aggregate2.handle(&command).await;
-            assert!(result.is_ok());
-        }
+    let handle2 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 2,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
     });
 
-    // Wait for both tasks to complete
-    let _ = tokio::join!(handle1, handle2);
+    handle1.join().unwrap().await;
+    handle2.join().unwrap().await;
 }
 
 #[tokio::test]
@@ -224,33 +220,29 @@ async fn ss_test() {
         repository,
         decider().map_error(|()| AggregateError::DomainError("Decider error".to_string())),
     ));
+    let aggregate1 = Arc::clone(&aggregate);
     let aggregate2 = Arc::clone(&aggregate);
 
-    let handle1 = tokio::spawn({
-        let aggregate = Arc::clone(&aggregate);
-        async move {
-            let command = OrderCommand::Create(CreateOrderCommand {
-                order_id: 1,
-                customer_name: "John Doe".to_string(),
-                items: vec!["Item 1".to_string(), "Item 2".to_string()],
-            });
-            let result = aggregate.handle(&command).await;
-            assert!(result.is_ok());
-        }
+    let handle1 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate1.handle(&command).await;
+        assert!(result.is_ok());
     });
 
-    let handle2 = tokio::spawn({
-        let aggregate2 = Arc::clone(&aggregate2);
-        async move {
-            let command = OrderCommand::Create(CreateOrderCommand {
-                order_id: 2,
-                customer_name: "John Doe".to_string(),
-                items: vec!["Item 1".to_string(), "Item 2".to_string()],
-            });
-            let result = aggregate2.handle(&command).await;
-            assert!(result.is_ok());
-        }
+    let handle2 = thread::spawn(|| async move {
+        let command = OrderCommand::Create(CreateOrderCommand {
+            order_id: 2,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+        let result = aggregate2.handle(&command).await;
+        assert!(result.is_ok());
     });
 
-    let _ = tokio::join!(handle1, handle2);
+    handle1.join().unwrap().await;
+    handle2.join().unwrap().await;
 }
