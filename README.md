@@ -430,14 +430,63 @@ Pushing these decisions from the core domain model is very valuable. Being able 
 
 ## Fearless Concurrency
 
+Concurrency and async programming do not require a multi-threaded environment. You can run async tasks on a single-threaded executor as well.
+
+`fmodel-rust` lets you choose between **multi-threaded async** and **single-threaded async** via a feature flag.
+
+
+| Single-threaded world | Multi-threaded world               |
+| --------------------- | ---------------------------------- |
+| `Rc<T>`               | `Arc<T>`                           |
+| `RefCell<T>`          | `Mutex<T>` / `RwLock<T>`           |
+| `Rc<RefCell<T>>`      | `Arc<Mutex<T>>` / `Arc<RwLock<T>>` |
+
+
 ### `Send` bound futures/Async (multi-threaded executors)
 
-Splitting the computation in your program into multiple threads to run multiple tasks at the same time can improve performance.
-However, programming with threads has a reputation for being difficult. Rust’s type system and ownership model guarantee thread safety.
+```toml
+[dependencies]
+fmodel-rust = { version = "0.8.2" }
+```
 
-Example of the concurrent execution of the aggregate in multi-threaded environment (**default** - `Send`-bound futures):
+If you don’t enable the feature, the **default** mode requires `Send` so your futures can safely hop between threads:
 
 ```rust
+#[cfg(not(feature = "not-send-futures"))]
+pub trait EventRepository<C, E, Version, Error> {
+    /// Fetches current events, based on the command.
+    /// Desugared `async fn fetch_events(&self, command: &C) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn fetch_events(
+        &self,
+        command: &C,
+    ) -> impl Future<Output = Result<Vec<(E, Version)>, Error>> + Send;
+    /// Saves events.
+    /// Desugared `async fn save(&self, events: &[E], latest_version: &Option<Version>) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn save(&self, events: &[E]) -> impl Future<Output = Result<Vec<(E, Version)>, Error>> + Send;
+
+    /// Version provider. It is used to provide the version/sequence of the stream to wich this event belongs to. Optimistic locking is useing this version to check if the event is already saved.
+    /// Desugared `async fn version_provider(&self, event: &E) -> Result<Option<Version>, Error>;` to a normal `fn` that returns `impl Future`, and adds bound `Send`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls. This is true even when one form has a Send bound.
+    fn version_provider(
+        &self,
+        event: &E,
+    ) -> impl Future<Output = Result<Option<Version>, Error>> + Send;
+}
+```
+
+This mode is designed for multi-threaded runtimes like `tokio`’s default executor, where futures may be scheduled on any worker thread.
+Here, you typically wrap shared state in `Arc<Mutex<T>>` or `Arc<RwLock<T>>`.
+
+
+Example of the concurrent execution of the aggregate in multi-threaded environment (`Send` bound futures):
+
+```rust
+struct InMemoryOrderEventRepository {
+    events: RwLock<Vec<(OrderEvent, i32)>>,
+}
+
 async fn es_test() {
     let repository = InMemoryOrderEventRepository::new();
     let aggregate = Arc::new(EventSourcedAggregate::new(
@@ -474,30 +523,47 @@ async fn es_test() {
 
 ### `Send` free futures/Async (single-threaded executors)
 
-Concurrency and async programming do not require a multi-threaded environment. You can run async tasks on a single-threaded executor, which allows you to write async code without the Send bound.
-
-This approach has several benefits:
-
-- Simpler code: No need for Arc, Mutex(RwLock), or other thread synchronization primitives for shared state.
-
-- Ergonomic references: You can freely use references within your async code without worrying about moving data across threads. 🤯
-
-- Efficient design: This model aligns with the “Thread-per-Core” pattern, letting you safely run multiple async tasks concurrently on a single thread.
-
-In short: you get all the power of async/await without the complexity of multi-threaded synchronization all the time.
-
-Just switching to a [LocalExecutor](https://docs.rs/async-executor/latest/async_executor/struct.LocalExecutor.html) or something like Tokio [LocalSet](https://docs.rs/tokio/latest/tokio/task/struct.LocalSet.html) should be enough.
-
-If you want to enable single-threaded, Send-free async support, you can enable the optional feature `not-send-futures` when adding fmodel-rust to your project:
-
 ```toml
 [dependencies]
 fmodel-rust = { version = "0.8.2", features = ["not-send-futures"] }
 ```
 
-Example of the concurrent execution of the aggregate in single-threaded environment (**behind feature** - `Send` free `Futures`):
+This mode removes the `Send` bound from async traits.
+It works well with single-threaded runtimes (`tokio::task::LocalSet`) and allows using lighter primitives like `Rc<RefCell<T>>`.
 
 ```rust
+#[cfg(feature = "not-send-futures")]
+pub trait EventRepository<C, E, Version, Error> {
+    /// Fetches current events, based on the command.
+    /// Desugared `async fn fetch_events(&self, command: &C) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`.
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls.
+    fn fetch_events(&self, command: &C) -> impl Future<Output = Result<Vec<(E, Version)>, Error>>;
+    /// Saves events.
+    /// Desugared `async fn save(&self, events: &[E], latest_version: &Option<Version>) -> Result<Vec<(E, Version)>, Error>;` to a normal `fn` that returns `impl Future`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls.
+    fn save(&self, events: &[E]) -> impl Future<Output = Result<Vec<(E, Version)>, Error>>;
+
+    /// Version provider. It is used to provide the version/sequence of the stream to wich this event belongs to. Optimistic locking is useing this version to check if the event is already saved.
+    /// Desugared `async fn version_provider(&self, event: &E) -> Result<Option<Version>, Error>;` to a normal `fn` that returns `impl Future`
+    /// You can freely move between the `async fn` and `-> impl Future` spelling in your traits and impls.
+    fn version_provider(&self, event: &E) -> impl Future<Output = Result<Option<Version>, Error>>;
+}
+```
+
+This approach has several benefits:
+
+- Simpler code: No need for `Arc`, `Mutex/RwLock`, or other expensive thread synchronization primitives.
+
+- Efficient design: This model aligns with the “Thread-per-Core” pattern, letting you safely run multiple async tasks concurrently on a single thread.
+
+
+Example of the concurrent execution of the aggregate in single-threaded environment (`Send` free `Futures`):
+
+```rust
+struct InMemoryOrderEventRepository {
+    events: RefCell<Vec<(OrderEvent, i32)>>,
+}
+
 async fn es_test_not_send() {
     let repository = InMemoryOrderEventRepository::new();
 
