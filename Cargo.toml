@@ -13,3 +13,7 @@ pretty_assertions = "1.4.1"
 derive_more = { version = "2", features = ["display"] }
 
 tokio = { version = "1.43.1", features = ["rt", "rt-multi-thread", "macros"] }
+
+[features]
+default = []           # default = Send futures
+not-send-futures = []  # opt into non-Send futures

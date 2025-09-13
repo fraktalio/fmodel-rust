@@ -1,3 +1,6 @@
+use std::sync::Arc;
+use std::thread;
+
 use fmodel_rust::saga::Saga;
 use fmodel_rust::saga_manager::{ActionPublisher, SagaManager};
 
@@ -49,23 +52,103 @@ impl ActionPublisher<ShipmentCommand, SagaManagerError> for SimpleActionPublishe
 
 #[tokio::test]
 async fn test() {
-    let saga: Saga<OrderEvent, ShipmentCommand> = saga();
-    let order_created_event = OrderEvent::Created(OrderCreatedEvent {
-        order_id: 1,
-        customer_name: "John Doe".to_string(),
-        items: vec!["Item 1".to_string(), "Item 2".to_string()],
-    });
+    let saga_manager = Arc::new(SagaManager::new(SimpleActionPublisher::new(), saga()));
+    let saga_manager1 = saga_manager.clone();
+    let saga_manager2 = saga_manager.clone();
 
-    let saga_manager = SagaManager::new(SimpleActionPublisher::new(), saga);
-    let result = saga_manager.handle(&order_created_event).await;
-    assert!(result.is_ok());
-    assert_eq!(
-        result.unwrap(),
-        vec![ShipmentCommand::Create(CreateShipmentCommand {
-            shipment_id: 1,
+    let handle1 = thread::spawn(|| async move {
+        let order_created_event = OrderEvent::Created(OrderCreatedEvent {
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
-        })]
-    );
+        });
+
+        let result = saga_manager1.handle(&order_created_event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            vec![ShipmentCommand::Create(CreateShipmentCommand {
+                shipment_id: 1,
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 1".to_string(), "Item 2".to_string()],
+            })]
+        );
+    });
+
+    let handle2 = thread::spawn(|| async move {
+        let order_created_event = OrderEvent::Created(OrderCreatedEvent {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 21".to_string(), "Item 22".to_string()],
+        });
+
+        let result = saga_manager2.handle(&order_created_event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            vec![ShipmentCommand::Create(CreateShipmentCommand {
+                shipment_id: 1,
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 21".to_string(), "Item 22".to_string()],
+            })]
+        );
+    });
+
+    handle1.join().unwrap().await;
+    handle2.join().unwrap().await;
+}
+
+#[cfg(feature = "not-send-futures")]
+#[tokio::test]
+async fn test2() {
+    use std::rc::Rc;
+
+    let saga_manager = Rc::new(SagaManager::new(SimpleActionPublisher::new(), saga()));
+    let saga_manager1 = saga_manager.clone();
+    let saga_manager2 = saga_manager.clone();
+
+    let task1 = async move {
+        let order_created_event = OrderEvent::Created(OrderCreatedEvent {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 1".to_string(), "Item 2".to_string()],
+        });
+
+        let result = saga_manager1.handle(&order_created_event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            vec![ShipmentCommand::Create(CreateShipmentCommand {
+                shipment_id: 1,
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 1".to_string(), "Item 2".to_string()],
+            })]
+        );
+    };
+
+    let task2 = async move {
+        let order_created_event = OrderEvent::Created(OrderCreatedEvent {
+            order_id: 1,
+            customer_name: "John Doe".to_string(),
+            items: vec!["Item 21".to_string(), "Item 22".to_string()],
+        });
+
+        let result = saga_manager2.handle(&order_created_event).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            vec![ShipmentCommand::Create(CreateShipmentCommand {
+                shipment_id: 1,
+                order_id: 1,
+                customer_name: "John Doe".to_string(),
+                items: vec!["Item 21".to_string(), "Item 22".to_string()],
+            })]
+        );
+    };
+
+    // Run both tasks concurrently on the same thread.
+    let _ = tokio::join!(task1, task2);
 }
