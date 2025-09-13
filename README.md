@@ -431,6 +431,7 @@ Pushing these decisions from the core domain model is very valuable. Being able 
 ## Fearless Concurrency
 
 `fmodel-rust` lets you choose between **single-threaded async** and **multi-threaded async** via a feature flag.
+Concurrency and async programming do not require a multi-threaded environment. You can run async tasks on a single-threaded executor as well.
 
 | Single-threaded world | Multi-threaded world               |
 | --------------------- | ---------------------------------- |
@@ -624,7 +625,7 @@ This approach has several benefits:
 - Efficient design: This model aligns with the “Thread-per-Core” pattern, letting you safely run multiple async tasks concurrently on a single thread.
 
 
-Example of the concurrent execution of the aggregate in single-threaded environment (**behind feature** - `Send` free `Futures`):
+Example of the concurrent execution of the aggregate in single-threaded environment (`Send` free `Futures`):
 
 ```rust
 async fn es_test_not_send() {
