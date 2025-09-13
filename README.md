@@ -432,7 +432,9 @@ Pushing these decisions from the core domain model is very valuable. Being able 
 
 Concurrency and async programming do not require a multi-threaded environment. You can run async tasks on a single-threaded executor as well.
 
-`fmodel-rust` lets you choose between **multi-threaded async** and **single-threaded async** via a feature flag.
+`fmodel-rust` supports both safe multi-threaded and ergonomic single-threaded scenarios without forcing users to pay for thread safety when they don't need it.
+
+`fmodel-rust` lets you choose between **multi-threaded async** and **single-threaded async** via an exlusive feature flag.
 
 
 | Single-threaded world | Multi-threaded world               |
@@ -603,6 +605,8 @@ You might wonder why all primitive types in Rust aren’t atomic and why standar
 **The reason is that thread safety comes with a performance penalty that you only want to pay when you really need to.**
 
 **You choose how to run it!** You can run it in a single-threaded, multi-threaded, or distributed environment.
+
+
 
 ## Install the crate as a dependency of your project
 
