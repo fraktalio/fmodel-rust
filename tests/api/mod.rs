@@ -6,6 +6,7 @@ use fmodel_rust::Identifier;
 
 /// The state of the Order entity
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub struct OrderState {
     pub order_id: u32,
     pub customer_name: String,
@@ -15,6 +16,7 @@ pub struct OrderState {
 
 /// The state of the ViewOrder entity / It represents the Query Model
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub struct OrderViewState {
     pub order_id: u32,
     pub customer_name: String,
@@ -24,6 +26,7 @@ pub struct OrderViewState {
 
 /// A second version of the ViewOrder entity / It represents the Query Model
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub struct OrderView2State {
     pub order_id: u32,
     pub customer_name: String,
@@ -114,6 +117,7 @@ impl Identifier for OrderEvent {
 
 /// The state of the Shipment entity
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub struct ShipmentState {
     pub shipment_id: u32,
     pub order_id: u32,
@@ -123,6 +127,7 @@ pub struct ShipmentState {
 
 /// The state of the ViewShipment entity / It represents the Query Model
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub struct ShipmentViewState {
     pub shipment_id: u32,
     pub order_id: u32,
