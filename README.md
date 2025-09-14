@@ -448,7 +448,7 @@ Concurrency and async programming do not require a multi-threaded environment. Y
 
 ```toml
 [dependencies]
-fmodel-rust = { version = "0.8.2" }
+fmodel-rust = { version = "0.9.0" }
 ```
 
 If you don’t enable the feature, the **default** mode requires `Send` so your futures can safely hop between threads:
@@ -527,7 +527,7 @@ async fn es_test() {
 
 ```toml
 [dependencies]
-fmodel-rust = { version = "0.8.2", features = ["not-send-futures"] }
+fmodel-rust = { version = "0.9.0", features = ["not-send-futures"] }
 ```
 
 This mode removes the `Send` bound from async traits.
@@ -617,7 +617,7 @@ cargo add fmodel-rust
 Or add the following line to your `Cargo.toml` file:
 
 ```toml
-fmodel-rust = "0.8.2"
+fmodel-rust = "0.9.0"
 ```
 
 ## Examples
