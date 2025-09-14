@@ -9,6 +9,7 @@ use fmodel_rust::aggregate::{
 };
 use fmodel_rust::decider::Decider;
 use fmodel_rust::Identifier;
+use tokio::task;
 
 use crate::api::{CreateOrderCommand, OrderCommand, OrderCreatedEvent, OrderEvent, OrderState};
 use crate::application::AggregateError;
@@ -149,13 +150,14 @@ fn decider<'a>() -> Decider<'a, OrderCommand, OrderState, OrderEvent> {
 async fn es_test_not_send() {
     let repository = InMemoryOrderEventRepository::new();
 
-    let aggregate = Rc::new(EventSourcedAggregate::new(
+    let aggregate = EventSourcedAggregate::new(
         repository,
         decider().map_error(|()| AggregateError::DomainError("Decider error".to_string())),
-    ));
-    let aggregate2 = Rc::clone(&aggregate);
+    );
 
-    let task1 = async move {
+    // Does not require `move` and `Rc`
+    // The futures are created and immediately consumed in the same function where aggregate lives, so the borrow checker can verify that aggregate lives long enough.
+    let task1 = async {
         let command = OrderCommand::Create(CreateOrderCommand {
             order_id: 1,
             customer_name: "Alice".to_string(),
@@ -165,18 +167,68 @@ async fn es_test_not_send() {
         assert!(result.is_ok());
     };
 
-    let task2 = async move {
+    let task2 = async {
         let command = OrderCommand::Create(CreateOrderCommand {
             order_id: 1,
             customer_name: "John Doe".to_string(),
             items: vec!["Item 1".to_string(), "Item 2".to_string()],
         });
-        let result = aggregate2.handle(&command).await;
+        let result = aggregate.handle(&command).await;
         assert!(result.is_ok());
     };
 
-    // Run both tasks concurrently on the same thread.
+    // Run both tasks concurrently on the same thread. Awaited immediately in the same scope
+    // The futures are created and immediately consumed in the same function where aggregate lives, so the borrow checker can verify that aggregate lives long enough.
     tokio::join!(task1, task2);
+}
+
+#[tokio::test]
+async fn es_test_not_send_with_spawn_local() {
+    // Create a LocalSet to run !Send futures
+    let local = task::LocalSet::new();
+
+    local
+        .run_until(async {
+            let repository = InMemoryOrderEventRepository::new();
+            let aggregate = Rc::new(EventSourcedAggregate::new(
+                repository,
+                decider().map_error(|()| AggregateError::DomainError("Decider error".to_string())),
+            ));
+
+            // Clone the Rc for each spawned task
+            let aggregate1 = Rc::clone(&aggregate);
+            let aggregate2 = Rc::clone(&aggregate);
+
+            // Spawn the first task locally - requires `move` and `Rc`
+            let handle1 = task::spawn_local(async move {
+                let command = OrderCommand::Create(CreateOrderCommand {
+                    order_id: 1,
+                    customer_name: "Alice".to_string(),
+                    items: vec!["Item1".to_string()],
+                });
+                let result = aggregate1.handle(&command).await;
+                assert!(result.is_ok());
+            });
+
+            // Spawn the second task locally - also requires `move` and `Rc`
+            let handle2 = task::spawn_local(async move {
+                let command = OrderCommand::Create(CreateOrderCommand {
+                    order_id: 2,
+                    customer_name: "Bob".to_string(),
+                    items: vec!["Item2".to_string()],
+                });
+                let result = aggregate2.handle(&command).await;
+                assert!(result.is_ok());
+            });
+
+            // Wait for both tasks to complete
+            let (result1, result2) = tokio::join!(handle1, handle2);
+
+            // Check that both tasks completed successfully
+            assert!(result1.is_ok());
+            assert!(result2.is_ok());
+        })
+        .await;
 }
 
 #[tokio::test]
