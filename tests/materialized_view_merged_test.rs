@@ -1,3 +1,5 @@
+#![cfg(not(feature = "not-send-futures"))]
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;

@@ -1,3 +1,5 @@
+#![cfg(not(feature = "not-send-futures"))]
+
 use std::sync::Arc;
 use std::thread;
 

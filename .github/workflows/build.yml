@@ -28,5 +28,8 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
-      - name: Run tests
+      - name: Run tests (not-send-futures)
         run: cargo test --features not-send-futures --verbose
+
+      - name: Run tests (default)
+        run: cargo test --verbose
