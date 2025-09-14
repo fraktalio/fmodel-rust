@@ -1,3 +1,6 @@
+#[cfg(feature = "not-send-futures")]
+use std::rc::Rc;
+#[cfg(not(feature = "not-send-futures"))]
 use std::sync::Arc;
 
 use crate::{EvolveFunction, InitialStateFunction, Sum, View3, View4, View5, View6};
@@ -90,6 +93,7 @@ pub struct View<'a, S: 'a, E: 'a> {
 impl<'a, S, E> View<'a, S, E> {
     /// Maps the View over the S/State type parameter.
     /// Creates a new instance of [View]`<S2, E>`.
+    #[cfg(not(feature = "not-send-futures"))]
     pub fn map_state<S2, F1, F2>(self, f1: F1, f2: F2) -> View<'a, S2, E>
     where
         F1: Fn(&S2) -> S + Send + Sync + 'a,
@@ -114,11 +118,59 @@ impl<'a, S, E> View<'a, S, E> {
         }
     }
 
+    /// Maps the View over the S/State type parameter.
+    /// Creates a new instance of [View]`<S2, E>`.
+    #[cfg(feature = "not-send-futures")]
+    pub fn map_state<S2, F1, F2>(self, f1: F1, f2: F2) -> View<'a, S2, E>
+    where
+        F1: Fn(&S2) -> S + 'a,
+        F2: Fn(&S) -> S2 + 'a,
+    {
+        let f1 = Rc::new(f1);
+        let f2 = Rc::new(f2);
+
+        let new_evolve = {
+            let f2 = Rc::clone(&f2);
+            Box::new(move |s2: &S2, e: &E| {
+                let s = f1(s2);
+                f2(&(self.evolve)(&s, e))
+            })
+        };
+
+        let new_initial_state = { Box::new(move || f2(&(self.initial_state)())) };
+
+        View {
+            evolve: new_evolve,
+            initial_state: new_initial_state,
+        }
+    }
+
     /// Maps the View over the E/Event type parameter.
     /// Creates a new instance of [View]`<S, E2>`.
+    #[cfg(not(feature = "not-send-futures"))]
     pub fn map_event<E2, F>(self, f: F) -> View<'a, S, E2>
     where
         F: Fn(&E2) -> E + Send + Sync + 'a,
+    {
+        let new_evolve = Box::new(move |s: &S, e2: &E2| {
+            let e = f(e2);
+            (self.evolve)(s, &e)
+        });
+
+        let new_initial_state = Box::new(move || (self.initial_state)());
+
+        View {
+            evolve: new_evolve,
+            initial_state: new_initial_state,
+        }
+    }
+
+    /// Maps the View over the E/Event type parameter.
+    /// Creates a new instance of [View]`<S, E2>`.
+    #[cfg(feature = "not-send-futures")]
+    pub fn map_event<E2, F>(self, f: F) -> View<'a, S, E2>
+    where
+        F: Fn(&E2) -> E + 'a,
     {
         let new_evolve = Box::new(move |s: &S, e2: &E2| {
             let e = f(e2);

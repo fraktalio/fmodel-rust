@@ -328,14 +328,31 @@ pub mod specification;
 pub mod view;
 
 /// The [DecideFunction] function is used to decide which events to produce based on the command and the current state.
+#[cfg(not(feature = "not-send-futures"))]
 pub type DecideFunction<'a, C, S, E, Error> =
     Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error> + 'a + Send + Sync>;
 /// The [EvolveFunction] function is used to evolve the state based on the current state and the event.
+#[cfg(not(feature = "not-send-futures"))]
 pub type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a + Send + Sync>;
 /// The [InitialStateFunction] function is used to produce the initial state.
+#[cfg(not(feature = "not-send-futures"))]
 pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a + Send + Sync>;
 /// The [ReactFunction] function is used to decide what actions/A to execute next based on the action result/AR.
+#[cfg(not(feature = "not-send-futures"))]
 pub type ReactFunction<'a, AR, A> = Box<dyn Fn(&AR) -> Vec<A> + 'a + Send + Sync>;
+
+/// The [DecideFunction] function is used to decide which events to produce based on the command and the current state.
+#[cfg(feature = "not-send-futures")]
+pub type DecideFunction<'a, C, S, E, Error> = Box<dyn Fn(&C, &S) -> Result<Vec<E>, Error> + 'a>;
+/// The [EvolveFunction] function is used to evolve the state based on the current state and the event.
+#[cfg(feature = "not-send-futures")]
+pub type EvolveFunction<'a, S, E> = Box<dyn Fn(&S, &E) -> S + 'a>;
+/// The [InitialStateFunction] function is used to produce the initial state.
+#[cfg(feature = "not-send-futures")]
+pub type InitialStateFunction<'a, S> = Box<dyn Fn() -> S + 'a>;
+/// The [ReactFunction] function is used to decide what actions/A to execute next based on the action result/AR.
+#[cfg(feature = "not-send-futures")]
+pub type ReactFunction<'a, AR, A> = Box<dyn Fn(&AR) -> Vec<A> + 'a>;
 
 /// Generic Combined/Sum Enum of two variants
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]

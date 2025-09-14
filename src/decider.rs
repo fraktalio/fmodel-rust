@@ -1,3 +1,6 @@
+#[cfg(feature = "not-send-futures")]
+use std::rc::Rc;
+#[cfg(not(feature = "not-send-futures"))]
 use std::sync::Arc;
 
 use crate::{
@@ -165,6 +168,7 @@ pub struct Decider<'a, C: 'a, S: 'a, E: 'a, Error: 'a = ()> {
 impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
     /// Maps the Decider over the S/State type parameter.
     /// Creates a new instance of [Decider]`<C, S2, E, Error>`.
+    #[cfg(not(feature = "not-send-futures"))]
     pub fn map_state<S2, F1, F2>(self, f1: F1, f2: F2) -> Decider<'a, C, S2, E, Error>
     where
         F1: Fn(&S2) -> S + Send + Sync + 'a,
@@ -198,8 +202,44 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
         }
     }
 
+    /// Maps the Decider over the S/State type parameter.
+    /// Creates a new instance of [Decider]`<C, S2, E, Error>`.
+    #[cfg(feature = "not-send-futures")]
+    pub fn map_state<S2, F1, F2>(self, f1: F1, f2: F2) -> Decider<'a, C, S2, E, Error>
+    where
+        F1: Fn(&S2) -> S + 'a,
+        F2: Fn(&S) -> S2 + 'a,
+    {
+        let f1 = Rc::new(f1);
+        let f2 = Rc::new(f2);
+
+        let new_decide = {
+            let f1 = Rc::clone(&f1);
+            Box::new(move |c: &C, s2: &S2| {
+                let s = f1(s2);
+                (self.decide)(c, &s)
+            })
+        };
+
+        let new_evolve = {
+            let f2 = Rc::clone(&f2);
+            Box::new(move |s2: &S2, e: &E| {
+                let s = f1(s2);
+                f2(&(self.evolve)(&s, e))
+            })
+        };
+
+        let new_initial_state = { Box::new(move || f2(&(self.initial_state)())) };
+
+        Decider {
+            decide: new_decide,
+            evolve: new_evolve,
+            initial_state: new_initial_state,
+        }
+    }
     /// Maps the Decider over the E/Event type parameter.
     /// Creates a new instance of [Decider]`<C, S, E2, Error>`.
+    #[cfg(not(feature = "not-send-futures"))]
     pub fn map_event<E2, F1, F2>(self, f1: F1, f2: F2) -> Decider<'a, C, S, E2, Error>
     where
         F1: Fn(&E2) -> E + Send + Sync + 'a,
@@ -223,8 +263,35 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
         }
     }
 
+    /// Maps the Decider over the E/Event type parameter.
+    /// Creates a new instance of [Decider]`<C, S, E2, Error>`.
+    #[cfg(feature = "not-send-futures")]
+    pub fn map_event<E2, F1, F2>(self, f1: F1, f2: F2) -> Decider<'a, C, S, E2, Error>
+    where
+        F1: Fn(&E2) -> E + 'a,
+        F2: Fn(&E) -> E2 + 'a,
+    {
+        let new_decide = Box::new(move |c: &C, s: &S| {
+            (self.decide)(c, s).map(|result| result.into_iter().map(|e: E| f2(&e)).collect())
+        });
+
+        let new_evolve = Box::new(move |s: &S, e2: &E2| {
+            let e = f1(e2);
+            (self.evolve)(s, &e)
+        });
+
+        let new_initial_state = Box::new(move || (self.initial_state)());
+
+        Decider {
+            decide: new_decide,
+            evolve: new_evolve,
+            initial_state: new_initial_state,
+        }
+    }
+
     /// Maps the Decider over the C/Command type parameter.
     /// Creates a new instance of [Decider]`<C2, S, E, Error>`.
+    #[cfg(not(feature = "not-send-futures"))]
     pub fn map_command<C2, F>(self, f: F) -> Decider<'a, C2, S, E, Error>
     where
         F: Fn(&C2) -> C + Send + Sync + 'a,
@@ -245,11 +312,55 @@ impl<'a, C, S, E, Error> Decider<'a, C, S, E, Error> {
         }
     }
 
+    /// Maps the Decider over the C/Command type parameter.
+    /// Creates a new instance of [Decider]`<C2, S, E, Error>`.
+    #[cfg(feature = "not-send-futures")]
+    pub fn map_command<C2, F>(self, f: F) -> Decider<'a, C2, S, E, Error>
+    where
+        F: Fn(&C2) -> C + 'a,
+    {
+        let new_decide = Box::new(move |c2: &C2, s: &S| {
+            let c = f(c2);
+            (self.decide)(&c, s)
+        });
+
+        let new_evolve = Box::new(move |s: &S, e: &E| (self.evolve)(s, e));
+
+        let new_initial_state = Box::new(move || (self.initial_state)());
+
+        Decider {
+            decide: new_decide,
+            evolve: new_evolve,
+            initial_state: new_initial_state,
+        }
+    }
+
     /// Maps the Decider over the Error type parameter.
     /// Creates a new instance of [Decider]`<C, S, E, Error2>`.
+    #[cfg(not(feature = "not-send-futures"))]
     pub fn map_error<Error2, F>(self, f: F) -> Decider<'a, C, S, E, Error2>
     where
         F: Fn(&Error) -> Error2 + Send + Sync + 'a,
+    {
+        let new_decide = Box::new(move |c: &C, s: &S| (self.decide)(c, s).map_err(|e| f(&e)));
+
+        let new_evolve = Box::new(move |s: &S, e: &E| (self.evolve)(s, e));
+
+        let new_initial_state = Box::new(move || (self.initial_state)());
+
+        Decider {
+            decide: new_decide,
+            evolve: new_evolve,
+            initial_state: new_initial_state,
+        }
+    }
+
+    /// Maps the Decider over the Error type parameter.
+    /// Creates a new instance of [Decider]`<C, S, E, Error2>`.
+    #[cfg(feature = "not-send-futures")]
+    pub fn map_error<Error2, F>(self, f: F) -> Decider<'a, C, S, E, Error2>
+    where
+        F: Fn(&Error) -> Error2 + 'a,
     {
         let new_decide = Box::new(move |c: &C, s: &S| (self.decide)(c, s).map_err(|e| f(&e)));
 

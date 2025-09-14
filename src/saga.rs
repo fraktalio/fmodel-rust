@@ -89,6 +89,7 @@ pub struct Saga<'a, AR: 'a, A: 'a> {
 impl<'a, AR, A> Saga<'a, AR, A> {
     /// Maps the Saga over the A/Action type parameter.
     /// Creates a new instance of [Saga]`<AR, A2>`.
+    #[cfg(not(feature = "not-send-futures"))]
     pub fn map_action<A2, F>(self, f: F) -> Saga<'a, AR, A2>
     where
         F: Fn(&A) -> A2 + Send + Sync + 'a,
@@ -101,11 +102,42 @@ impl<'a, AR, A> Saga<'a, AR, A> {
         Saga { react: new_react }
     }
 
+    /// Maps the Saga over the A/Action type parameter.
+    /// Creates a new instance of [Saga]`<AR, A2>`.
+    #[cfg(feature = "not-send-futures")]
+    pub fn map_action<A2, F>(self, f: F) -> Saga<'a, AR, A2>
+    where
+        F: Fn(&A) -> A2 + 'a,
+    {
+        let new_react = Box::new(move |ar: &AR| {
+            let a = (self.react)(ar);
+            a.into_iter().map(|a: A| f(&a)).collect()
+        });
+
+        Saga { react: new_react }
+    }
+
     /// Maps the Saga over the AR/ActionResult type parameter.
     /// Creates a new instance of [Saga]`<AR2, A>`.
+    #[cfg(not(feature = "not-send-futures"))]
     pub fn map_action_result<AR2, F>(self, f: F) -> Saga<'a, AR2, A>
     where
         F: Fn(&AR2) -> AR + Send + Sync + 'a,
+    {
+        let new_react = Box::new(move |ar2: &AR2| {
+            let ar = f(ar2);
+            (self.react)(&ar)
+        });
+
+        Saga { react: new_react }
+    }
+
+    /// Maps the Saga over the AR/ActionResult type parameter.
+    /// Creates a new instance of [Saga]`<AR2, A>`.
+    #[cfg(feature = "not-send-futures")]
+    pub fn map_action_result<AR2, F>(self, f: F) -> Saga<'a, AR2, A>
+    where
+        F: Fn(&AR2) -> AR + 'a,
     {
         let new_react = Box::new(move |ar2: &AR2| {
             let ar = f(ar2);
