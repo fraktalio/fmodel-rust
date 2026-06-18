@@ -21,7 +21,7 @@ jobs:
         with:
           rust-version: ${{ matrix.rust }}
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Publish
         run: cargo publish --token ${CRATES_TOKEN}
